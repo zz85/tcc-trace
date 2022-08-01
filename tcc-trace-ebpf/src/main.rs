@@ -10,16 +10,18 @@ use aya_log_ebpf::info;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct sockaddr {
-    pub sa_family: u16,
-    pub sa_data: [::aya_bpf::cty::c_char; 14usize],
-    // 14 * 4 bytes
+    pub sa_family: AddressFamily,
+    pub port: u16,
+    pub addr: u32,
+    pub ip: [u8; 8],
 }
 
+pub type AddressFamily = u16;
 
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct sockaddr_in6 {
-    pub sin6_family: u16,
+    pub sin6_family: AddressFamily,
     pub sin6_port: u16,
     pub sin6_flowinfo: u32,
     pub sin6_addr: in6_addr,
@@ -33,14 +35,13 @@ pub struct in6_addr {
     // some fields omitted
 }
 
-
+// saddr: sockaddr_in6,
+// daddr: sockaddr_in6,
 
 #[repr(C)]
 #[derive(Copy, Clone)]
 
 struct TcpProbe {
-    saddr: sockaddr_in6,
-    daddr: sockaddr_in6,
     sport: u16,
     dport: u16,
     mark: u32,
@@ -63,8 +64,66 @@ pub fn tcc_trace(ctx: TracePointContext) -> u64 {
     }
 }
 
+unsafe fn get(offset: usize, ctx: &TracePointContext) -> Result<u64, u64> {
+    let family: AddressFamily = ctx.read_at(offset).map_err(|e| e as u64)?;
+    match family {
+        AF_INET => {
+            let addr: sockaddr = ctx.read_at(offset).map_err(|e| e as u64)?;
+            info!(
+                ctx,
+                "IP4 source {}.{}.{}.{} port {} ",
+                addr.ip[0],
+                addr.ip[1],
+                addr.ip[2],
+                addr.ip[3],
+                u16::from_be(addr.port)
+            );
+        }
+        AF_INET | AF_INET6 => {
+            let addr: sockaddr_in6 = ctx.read_at(offset).map_err(|e| e as u64)?;
+            info!(
+                ctx,
+                "IP6  {} Port: {}",
+                addr.sin6_family,
+                u16::from_be(addr.sin6_port)
+            );
+            info!(
+                ctx,
+                "{} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} ",
+                addr.sin6_addr.s6_addr[0],
+                addr.sin6_addr.s6_addr[1],
+                addr.sin6_addr.s6_addr[2],
+                addr.sin6_addr.s6_addr[3],
+                addr.sin6_addr.s6_addr[4],
+                addr.sin6_addr.s6_addr[5],
+                addr.sin6_addr.s6_addr[6],
+                addr.sin6_addr.s6_addr[7],
+                addr.sin6_addr.s6_addr[8],
+                addr.sin6_addr.s6_addr[9],
+                addr.sin6_addr.s6_addr[10],
+                addr.sin6_addr.s6_addr[11],
+                addr.sin6_addr.s6_addr[12],
+                addr.sin6_addr.s6_addr[13],
+                addr.sin6_addr.s6_addr[14],
+                addr.sin6_addr.s6_addr[15],
+            );
+        }
+        _ => {}
+    }
+
+    Ok(0)
+}
+
+const SADDR_OFFSET: usize = 8;
+const DADDR_OFFSET: usize = 36;
+const SPORT_OFFSET: usize = 64;
+
+const AF_INET: AddressFamily = 2;
+const AF_INET6: AddressFamily = 10;
+
 unsafe fn try_tcc_trace(ctx: TracePointContext) -> Result<u64, u64> {
     /*
+    https://elixir.bootlin.com/linux/v4.0/source/net/ipv4/tcp_probe.c
         % sudo cat /sys/kernel/debug/tracing/events/tcp/tcp_probe/format
     name: tcp_probe
     ID: 624
@@ -92,16 +151,11 @@ unsafe fn try_tcc_trace(ctx: TracePointContext) -> Result<u64, u64> {
     print fmt: "src=%pISpc dest=%pISpc mark=%#x data_len=%d snd_nxt=%#x snd_una=%#x snd_cwnd=%u ssthresh=%u snd_wnd=%u srtt=%u rcv_wnd=%u sock_cookie=%llx", REC->saddr, REC->daddr, REC->mark, REC->data_len, REC->snd_nxt, REC->snd_una, REC->snd_cwnd, REC->ssthresh, REC->snd_wnd, REC->srtt, REC->rcv_wnd, REC->sock_cookie
         */
 
-    const SADDR_OFFSET: usize = 8;
-    let probe: TcpProbe = ctx.read_at(SADDR_OFFSET).map_err(|e| e as u64)?;
-
-
-    // AF_INET 2
-    // define AF_INET6 10
+    let probe: TcpProbe = ctx.read_at(SPORT_OFFSET).map_err(|e| e as u64)?;
 
     let TcpProbe {
-        saddr,
-        daddr,
+        // saddr,
+        // daddr,
         sport,
         dport,
         mark,
@@ -116,49 +170,14 @@ unsafe fn try_tcc_trace(ctx: TracePointContext) -> Result<u64, u64> {
         sock_cookie,
     } = probe;
 
-    let target_port = 443;
+    let target_port = 22;
 
     if sport == target_port || dport == target_port {
         info!(&ctx, "tracepoint tcp_probe called");
-        info!(&ctx, "tracepoint tcp_probe called");
-
-        info!(&ctx, "s {} d {}", saddr.sin6_family, daddr.sin6_family);
-        info!(&ctx, "{} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} ", 
-        saddr.sin6_addr.s6_addr[0],
-        saddr.sin6_addr.s6_addr[1],
-        saddr.sin6_addr.s6_addr[2],
-        saddr.sin6_addr.s6_addr[3],
-        saddr.sin6_addr.s6_addr[4],
-        saddr.sin6_addr.s6_addr[5],
-        saddr.sin6_addr.s6_addr[6],
-        saddr.sin6_addr.s6_addr[7],
-        saddr.sin6_addr.s6_addr[8],
-        saddr.sin6_addr.s6_addr[9],
-        saddr.sin6_addr.s6_addr[10],
-        saddr.sin6_addr.s6_addr[11],
-        saddr.sin6_addr.s6_addr[12],
-        saddr.sin6_addr.s6_addr[13],
-        saddr.sin6_addr.s6_addr[14],
-        saddr.sin6_addr.s6_addr[15],);
 
         // sockaddr_in6 sockaddr_in union
-        // info!(&ctx, "{} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} ", 
-        // daddr.sin6_addr.s6_addr[0],
-        // daddr.sin6_addr.s6_addr[1],
-        // daddr.sin6_addr.s6_addr[2],
-        // daddr.sin6_addr.s6_addr[3],
-        // daddr.sin6_addr.s6_addr[4],
-        // daddr.sin6_addr.s6_addr[5],
-        // daddr.sin6_addr.s6_addr[6],
-        // daddr.sin6_addr.s6_addr[7],
-        // daddr.sin6_addr.s6_addr[8],
-        // daddr.sin6_addr.s6_addr[9],
-        // daddr.sin6_addr.s6_addr[10],
-        // daddr.sin6_addr.s6_addr[11],
-        // daddr.sin6_addr.s6_addr[12],
-        // daddr.sin6_addr.s6_addr[13],
-        // daddr.sin6_addr.s6_addr[14],
-        // daddr.sin6_addr.s6_addr[15],);
+        // get(SADDR_OFFSET, &ctx);
+        get(DADDR_OFFSET, &ctx);
 
         info!(
             &ctx,
