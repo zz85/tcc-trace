@@ -12,8 +12,8 @@ use aya_log_ebpf::info;
 pub struct sockaddr {
     pub sa_family: AddressFamily,
     pub port: u16,
-    pub addr: u32,
-    pub ip: [u8; 8],
+    pub addr: [u8; 4],
+    pub zeros: [u8; 8], // just padding
 }
 
 pub type AddressFamily = u16;
@@ -72,14 +72,14 @@ unsafe fn get(offset: usize, ctx: &TracePointContext) -> Result<u64, u64> {
             info!(
                 ctx,
                 "IP4 source {}.{}.{}.{} port {} ",
-                addr.ip[0],
-                addr.ip[1],
-                addr.ip[2],
-                addr.ip[3],
+                addr.addr[0],
+                addr.addr[1],
+                addr.addr[2],
+                addr.addr[3],
                 u16::from_be(addr.port)
             );
         }
-        AF_INET | AF_INET6 => {
+        AF_INET6 => {
             let addr: sockaddr_in6 = ctx.read_at(offset).map_err(|e| e as u64)?;
             info!(
                 ctx,
@@ -123,6 +123,9 @@ const AF_INET6: AddressFamily = 10;
 
 unsafe fn try_tcc_trace(ctx: TracePointContext) -> Result<u64, u64> {
     /*
+
+    https://github.com/libpnet/libpnet/blob/44f17c8c570caf244b0df52e69bbda7b545fb7f3/pnet_sys/src/unix.rs#L169
+
     https://elixir.bootlin.com/linux/v4.0/source/net/ipv4/tcp_probe.c
         % sudo cat /sys/kernel/debug/tracing/events/tcp/tcp_probe/format
     name: tcp_probe
@@ -170,14 +173,14 @@ unsafe fn try_tcc_trace(ctx: TracePointContext) -> Result<u64, u64> {
         sock_cookie,
     } = probe;
 
-    let target_port = 22;
+    let target_port = 443;
 
     if sport == target_port || dport == target_port {
         info!(&ctx, "tracepoint tcp_probe called");
 
         // sockaddr_in6 sockaddr_in union
         // get(SADDR_OFFSET, &ctx);
-        get(DADDR_OFFSET, &ctx);
+        // get(DADDR_OFFSET, &ctx);
 
         info!(
             &ctx,
