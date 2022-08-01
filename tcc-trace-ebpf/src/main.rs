@@ -7,9 +7,17 @@ use aya_log_ebpf::info;
 // sockaddr_in6
 // uapi (x), rustix (x), libc (X), relibc (X), aya-gen, nix (X)
 
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sockaddr {
+    pub sa_family: u16,
+    pub sa_data: [::aya_bpf::cty::c_char; 14usize],
+    // 14 * 4 bytes
+}
+
 
 #[repr(C)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 pub struct sockaddr_in6 {
     pub sin6_family: u16,
     pub sin6_port: u16,
@@ -19,12 +27,33 @@ pub struct sockaddr_in6 {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 pub struct in6_addr {
     pub s6_addr: [u8; 16],
     // some fields omitted
 }
 
+
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+
+struct TcpProbe {
+    saddr: sockaddr_in6,
+    daddr: sockaddr_in6,
+    sport: u16,
+    dport: u16,
+    mark: u32,
+    data_len: u16,
+    snd_nxt: u32,
+    snd_una: u32,
+    snd_cwnd: u32,
+    ssthresh: u32,
+    snd_wnd: u32,
+    srtt: u32,
+    rcv_wnd: u32,
+    sock_cookie: u64,
+}
 
 #[tracepoint(name = "tcc_trace")]
 pub fn tcc_trace(ctx: TracePointContext) -> u64 {
@@ -63,41 +92,74 @@ unsafe fn try_tcc_trace(ctx: TracePointContext) -> Result<u64, u64> {
     print fmt: "src=%pISpc dest=%pISpc mark=%#x data_len=%d snd_nxt=%#x snd_una=%#x snd_cwnd=%u ssthresh=%u snd_wnd=%u srtt=%u rcv_wnd=%u sock_cookie=%llx", REC->saddr, REC->daddr, REC->mark, REC->data_len, REC->snd_nxt, REC->snd_una, REC->snd_cwnd, REC->ssthresh, REC->snd_wnd, REC->srtt, REC->rcv_wnd, REC->sock_cookie
         */
 
-    const saddr_offset: usize = 8;
-    const daddr_offset: usize = 32;
-    const sport_offset: usize = 64;
-    const dport_offset: usize = 66;
-    const mark_offset: usize = 68;
-    const data_len_offset: usize = 72;
-    const snd_nxt_offset: usize = 76;
-    const snd_una_offset: usize = 80;
-    const snd_cwnd_offset: usize = 84;
-    const ssthresh_offset: usize = 88;
-    const snd_wnd_offset: usize = 92;
-    const srtt_offset: usize = 96;
-    const rcv_wnd_offset: usize = 100;
-    const sock_cookie_offset: usize = 104;
+    const SADDR_OFFSET: usize = 8;
+    let probe: TcpProbe = ctx.read_at(SADDR_OFFSET).map_err(|e| e as u64)?;
 
-    let saddr: sockaddr_in6 = ctx.read_at(saddr_offset).map_err(|e| e as u64)?;
-    let daddr: sockaddr_in6 = ctx.read_at(daddr_offset).map_err(|e| e as u64)?;
 
-    let sport: u16 = ctx.read_at(sport_offset).map_err(|e| e as u64)?;
-    let dport: u16 = ctx.read_at(dport_offset).map_err(|e| e as u64)?;
-    let mark: u32 = ctx.read_at(mark_offset).map_err(|e| e as u64)?;
-    let data_len: u16 = ctx.read_at(data_len_offset).map_err(|e| e as u64)?;
-    let snd_nxt: u32 = ctx.read_at(snd_nxt_offset).map_err(|e| e as u64)?;
-    let snd_una: u32 = ctx.read_at(snd_una_offset).map_err(|e| e as u64)?;
-    let snd_cwnd: u32 = ctx.read_at(snd_cwnd_offset).map_err(|e| e as u64)?;
-    let ssthresh: u32 = ctx.read_at(ssthresh_offset).map_err(|e| e as u64)?;
-    let snd_wnd: u32 = ctx.read_at(snd_wnd_offset).map_err(|e| e as u64)?;
-    let srtt: u32 = ctx.read_at(srtt_offset).map_err(|e| e as u64)?;
-    let rcv_wnd: u32 = ctx.read_at(rcv_wnd_offset).map_err(|e| e as u64)?;
-    let sock_cookie: u64 = ctx.read_at(sock_cookie_offset).map_err(|e| e as u64)?;
+    // AF_INET 2
+    // define AF_INET6 10
 
-    let target_port = 22;
+    let TcpProbe {
+        saddr,
+        daddr,
+        sport,
+        dport,
+        mark,
+        data_len,
+        snd_nxt,
+        snd_una,
+        snd_cwnd,
+        ssthresh,
+        snd_wnd,
+        srtt,
+        rcv_wnd,
+        sock_cookie,
+    } = probe;
+
+    let target_port = 443;
 
     if sport == target_port || dport == target_port {
-        info!(&ctx, "tracepoint tcp_probe called {} {}", saddr.sin6_addr.s6_addr[0], daddr.sin6_addr.s6_addr[0]);
+        info!(&ctx, "tracepoint tcp_probe called");
+        info!(&ctx, "tracepoint tcp_probe called");
+
+        info!(&ctx, "s {} d {}", saddr.sin6_family, daddr.sin6_family);
+        info!(&ctx, "{} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} ", 
+        saddr.sin6_addr.s6_addr[0],
+        saddr.sin6_addr.s6_addr[1],
+        saddr.sin6_addr.s6_addr[2],
+        saddr.sin6_addr.s6_addr[3],
+        saddr.sin6_addr.s6_addr[4],
+        saddr.sin6_addr.s6_addr[5],
+        saddr.sin6_addr.s6_addr[6],
+        saddr.sin6_addr.s6_addr[7],
+        saddr.sin6_addr.s6_addr[8],
+        saddr.sin6_addr.s6_addr[9],
+        saddr.sin6_addr.s6_addr[10],
+        saddr.sin6_addr.s6_addr[11],
+        saddr.sin6_addr.s6_addr[12],
+        saddr.sin6_addr.s6_addr[13],
+        saddr.sin6_addr.s6_addr[14],
+        saddr.sin6_addr.s6_addr[15],);
+
+        // sockaddr_in6 sockaddr_in union
+        // info!(&ctx, "{} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} ", 
+        // daddr.sin6_addr.s6_addr[0],
+        // daddr.sin6_addr.s6_addr[1],
+        // daddr.sin6_addr.s6_addr[2],
+        // daddr.sin6_addr.s6_addr[3],
+        // daddr.sin6_addr.s6_addr[4],
+        // daddr.sin6_addr.s6_addr[5],
+        // daddr.sin6_addr.s6_addr[6],
+        // daddr.sin6_addr.s6_addr[7],
+        // daddr.sin6_addr.s6_addr[8],
+        // daddr.sin6_addr.s6_addr[9],
+        // daddr.sin6_addr.s6_addr[10],
+        // daddr.sin6_addr.s6_addr[11],
+        // daddr.sin6_addr.s6_addr[12],
+        // daddr.sin6_addr.s6_addr[13],
+        // daddr.sin6_addr.s6_addr[14],
+        // daddr.sin6_addr.s6_addr[15],);
+
         info!(
             &ctx,
             "sport {} dport {} mark {} data len {}", sport, dport, mark, data_len
