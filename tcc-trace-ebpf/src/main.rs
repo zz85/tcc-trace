@@ -8,14 +8,14 @@ use aya_bpf::{
 use aya_log_ebpf::info;
 
 #[tracepoint(name="tcc_trace")]
-pub fn tcc_trace(ctx: TracePointContext) -> u32 {
+pub fn tcc_trace(ctx: TracePointContext) -> u64 {
     match unsafe { try_tcc_trace(ctx) } {
         Ok(ret) => ret,
         Err(ret) => ret,
     }
 }
 
-unsafe fn try_tcc_trace(ctx: TracePointContext) -> Result<u32, u32> {
+unsafe fn try_tcc_trace(ctx: TracePointContext) -> Result<u64, u64> {
     /*
     % sudo cat /sys/kernel/debug/tracing/events/tcp/tcp_probe/format
 name: tcp_probe
@@ -57,20 +57,20 @@ print fmt: "src=%pISpc dest=%pISpc mark=%#x data_len=%d snd_nxt=%#x snd_una=%#x 
     const rcv_wnd_offset: usize = 100;
     const sock_cookie_offset: usize = 104;
 
-    let sport: u16 = ctx.read_at(sport_offset).map_err(|e| e as u32)?;
-    let dport: u16 = ctx.read_at(dport_offset).map_err(|e| e as u32)?;
-    let mark: u32 = ctx.read_at(mark_offset).map_err(|e| e as u32)?;
-    let data_len: u16 = ctx.read_at(data_len_offset).map_err(|e| e as u32)?;
-    let snd_nxt: u32 = ctx.read_at(snd_nxt_offset).map_err(|e| e as u32)?;
-    let snd_una: u32 = ctx.read_at(snd_una_offset).map_err(|e| e as u32)?;
-    let snd_cwnd: u32 = ctx.read_at(snd_cwnd_offset).map_err(|e| e as u32)?;
-    let ssthresh: u32 = ctx.read_at(ssthresh_offset).map_err(|e| e as u32)?;
-    let snd_wnd: u32 = ctx.read_at(snd_wnd_offset).map_err(|e| e as u32)?;
-    let srtt: u32 = ctx.read_at(srtt_offset).map_err(|e| e as u32)?;
-    let rcv_wnd: u32 = ctx.read_at(rcv_wnd_offset).map_err(|e| e as u32)?;
-    let sock_cookie: u64 = ctx.read_at(sock_cookie_offset).map_err(|e| e as u32)?;
+    let sport: u16 = ctx.read_at(sport_offset).map_err(|e| e as u64)?;
+    let dport: u16 = ctx.read_at(dport_offset).map_err(|e| e as u64)?;
+    let mark: u32 = ctx.read_at(mark_offset).map_err(|e| e as u64)?;
+    let data_len: u16 = ctx.read_at(data_len_offset).map_err(|e| e as u64)?;
+    let snd_nxt: u32 = ctx.read_at(snd_nxt_offset).map_err(|e| e as u64)?;
+    let snd_una: u32 = ctx.read_at(snd_una_offset).map_err(|e| e as u64)?;
+    let snd_cwnd: u32 = ctx.read_at(snd_cwnd_offset).map_err(|e| e as u64)?;
+    let ssthresh: u32 = ctx.read_at(ssthresh_offset).map_err(|e| e as u64)?;
+    let snd_wnd: u32 = ctx.read_at(snd_wnd_offset).map_err(|e| e as u64)?;
+    let srtt: u32 = ctx.read_at(srtt_offset).map_err(|e| e as u64)?;
+    let rcv_wnd: u32 = ctx.read_at(rcv_wnd_offset).map_err(|e| e as u64)?;
+    let sock_cookie: u64 = ctx.read_at(sock_cookie_offset).map_err(|e| e as u64)?;
 
-    let target_port = 22;
+    let target_port = 443;
 
     if sport == target_port || dport == target_port {
         info!(&ctx, "tracepoint tcp_probe called");
