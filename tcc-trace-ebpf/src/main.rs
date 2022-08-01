@@ -5,7 +5,26 @@ use aya_bpf::{macros::tracepoint, programs::TracePointContext};
 use aya_log_ebpf::info;
 
 // sockaddr_in6
-// uapi, rustix, libc, relibc, aya-gen
+// uapi (x), rustix (x), libc (X), relibc (X), aya-gen, nix (X)
+
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+pub struct sockaddr_in6 {
+    pub sin6_family: u16,
+    pub sin6_port: u16,
+    pub sin6_flowinfo: u32,
+    pub sin6_addr: in6_addr,
+    pub sin6_scope_id: u32,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+pub struct in6_addr {
+    pub s6_addr: [u8; 16],
+    // some fields omitted
+}
+
 
 #[tracepoint(name = "tcc_trace")]
 pub fn tcc_trace(ctx: TracePointContext) -> u64 {
@@ -44,6 +63,8 @@ unsafe fn try_tcc_trace(ctx: TracePointContext) -> Result<u64, u64> {
     print fmt: "src=%pISpc dest=%pISpc mark=%#x data_len=%d snd_nxt=%#x snd_una=%#x snd_cwnd=%u ssthresh=%u snd_wnd=%u srtt=%u rcv_wnd=%u sock_cookie=%llx", REC->saddr, REC->daddr, REC->mark, REC->data_len, REC->snd_nxt, REC->snd_una, REC->snd_cwnd, REC->ssthresh, REC->snd_wnd, REC->srtt, REC->rcv_wnd, REC->sock_cookie
         */
 
+    const saddr_offset: usize = 8;
+    const daddr_offset: usize = 32;
     const sport_offset: usize = 64;
     const dport_offset: usize = 66;
     const mark_offset: usize = 68;
@@ -57,8 +78,8 @@ unsafe fn try_tcc_trace(ctx: TracePointContext) -> Result<u64, u64> {
     const rcv_wnd_offset: usize = 100;
     const sock_cookie_offset: usize = 104;
 
-    let saddr: [u8; 28] = ctx.read_at(8).map_err(|e| e as u64)?;
-    let daddr: [u8; 28] = ctx.read_at(8).map_err(|e| e as u64)?;
+    let saddr: sockaddr_in6 = ctx.read_at(saddr_offset).map_err(|e| e as u64)?;
+    let daddr: sockaddr_in6 = ctx.read_at(daddr_offset).map_err(|e| e as u64)?;
 
     let sport: u16 = ctx.read_at(sport_offset).map_err(|e| e as u64)?;
     let dport: u16 = ctx.read_at(dport_offset).map_err(|e| e as u64)?;
@@ -76,7 +97,7 @@ unsafe fn try_tcc_trace(ctx: TracePointContext) -> Result<u64, u64> {
     let target_port = 22;
 
     if sport == target_port || dport == target_port {
-        info!(&ctx, "tracepoint tcp_probe called");
+        info!(&ctx, "tracepoint tcp_probe called {} {}", saddr.sin6_addr.s6_addr[0], daddr.sin6_addr.s6_addr[0]);
         info!(
             &ctx,
             "sport {} dport {} mark {} data len {}", sport, dport, mark, data_len
