@@ -1,0 +1,3 @@
+{
+  "rust-analyzer.linkedProjects": ["Cargo.toml", "tcc-trace-ebpf/Cargo.toml"]
+}
