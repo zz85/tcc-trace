@@ -35,13 +35,19 @@ pub struct in6_addr {
     // some fields omitted
 }
 
-// saddr: sockaddr_in6,
-// daddr: sockaddr_in6,
+#[repr(C)]
+#[derive(Copy, Clone)]
+union sock {
+    v4: sockaddr,
+    v6: sockaddr_in6,
+}
 
 #[repr(C)]
 #[derive(Copy, Clone)]
 
 struct TcpProbe {
+    saddr: sock,
+    daddr: sock,
     sport: u16,
     dport: u16,
     mark: u32,
@@ -64,11 +70,10 @@ pub fn tcc_trace(ctx: TracePointContext) -> u64 {
     }
 }
 
-unsafe fn get(offset: usize, ctx: &TracePointContext) -> Result<u64, u64> {
-    let family: AddressFamily = ctx.read_at(offset).map_err(|e| e as u64)?;
-    match family {
+unsafe fn get(sock: sock, ctx: &TracePointContext) {
+    match sock.v6.sin6_family {
         AF_INET => {
-            let addr: sockaddr = ctx.read_at(offset).map_err(|e| e as u64)?;
+            let addr = sock.v4;
             info!(
                 ctx,
                 "IP4 source {}.{}.{}.{} port {} ",
@@ -80,7 +85,7 @@ unsafe fn get(offset: usize, ctx: &TracePointContext) -> Result<u64, u64> {
             );
         }
         AF_INET6 => {
-            let addr: sockaddr_in6 = ctx.read_at(offset).map_err(|e| e as u64)?;
+            let addr = sock.v6;
             info!(
                 ctx,
                 "IP6  {} Port: {}",
@@ -110,13 +115,9 @@ unsafe fn get(offset: usize, ctx: &TracePointContext) -> Result<u64, u64> {
         }
         _ => {}
     }
-
-    Ok(0)
 }
 
 const SADDR_OFFSET: usize = 8;
-const DADDR_OFFSET: usize = 36;
-const SPORT_OFFSET: usize = 64;
 
 const AF_INET: AddressFamily = 2;
 const AF_INET6: AddressFamily = 10;
@@ -154,11 +155,11 @@ unsafe fn try_tcc_trace(ctx: TracePointContext) -> Result<u64, u64> {
     print fmt: "src=%pISpc dest=%pISpc mark=%#x data_len=%d snd_nxt=%#x snd_una=%#x snd_cwnd=%u ssthresh=%u snd_wnd=%u srtt=%u rcv_wnd=%u sock_cookie=%llx", REC->saddr, REC->daddr, REC->mark, REC->data_len, REC->snd_nxt, REC->snd_una, REC->snd_cwnd, REC->ssthresh, REC->snd_wnd, REC->srtt, REC->rcv_wnd, REC->sock_cookie
         */
 
-    let probe: TcpProbe = ctx.read_at(SPORT_OFFSET).map_err(|e| e as u64)?;
+    let probe: TcpProbe = ctx.read_at(SADDR_OFFSET).map_err(|e| e as u64)?;
 
     let TcpProbe {
-        // saddr,
-        // daddr,
+        saddr,
+        daddr,
         sport,
         dport,
         mark,
@@ -177,10 +178,8 @@ unsafe fn try_tcc_trace(ctx: TracePointContext) -> Result<u64, u64> {
 
     if sport == target_port || dport == target_port {
         info!(&ctx, "tracepoint tcp_probe called");
-
-        // sockaddr_in6 sockaddr_in union
-        // get(SADDR_OFFSET, &ctx);
-        // get(DADDR_OFFSET, &ctx);
+        get(saddr, &ctx);
+        get(daddr, &ctx);
 
         info!(
             &ctx,
