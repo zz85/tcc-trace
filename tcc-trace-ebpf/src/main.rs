@@ -31,6 +31,10 @@ unsafe fn try_tcc_trace(ctx: TracePointContext) -> Result<u64, i64> {
         // Currently, we'll make do with sending and filtering in user space
     }
 
+    // TODO add timestamp via
+    // bpf_ktime_get_ns
+    // bpf_ktime_get_boot_ns
+
     // send perf event
     TCP_PROBES.output(&ctx, &probe, 0);
 

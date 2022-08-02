@@ -37,7 +37,6 @@ format:
 print fmt: "src=%pISpc dest=%pISpc mark=%#x data_len=%d snd_nxt=%#x snd_una=%#x snd_cwnd=%u ssthresh=%u snd_wnd=%u srtt=%u rcv_wnd=%u sock_cookie=%llx", REC->saddr, REC->daddr, REC->mark, REC->data_len, REC->snd_nxt, REC->snd_una, REC->snd_cwnd, REC->ssthresh, REC->snd_wnd, REC->srtt, REC->rcv_wnd, REC->sock_cookie
 */
 
-
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct TcpProbe {
@@ -60,7 +59,6 @@ pub struct TcpProbe {
     pub rcv_wnd: u32,
     pub sock_cookie: u64,
 }
-
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
