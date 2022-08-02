@@ -1,6 +1,7 @@
 # tcc-trace
 
-TCC Trace = TCP Congestion Control Tracing, implemented with ebpf using tcp/tcp_probe tracepoint using the aya rust library.
+### TCC Trace = TCP Congestion Control Tracing
+implemented with ebpf using tcp/tcp_probe tracepoint using the aya rust library.
 
 ```
 12:02:46 [INFO] tcc_trace: [tcc-trace/src/main.rs:43] Waiting for Ctrl-C...
@@ -28,6 +29,15 @@ TCC Trace = TCP Congestion Control Tracing, implemented with ebpf using tcp/tcp_
 12:02:48 [INFO] tcc_trace: [src/main.rs:77] sport 54806 dport 443 mark 0 data len 31
 12:02:48 [INFO] tcc_trace: [src/main.rs:78] snd_nxt 610998340 snd_una 610998309 snd_cwnd 10 ssthresh 2147483647
 ```
+
+## Motivation
+I built this because I wanted to find out how linux tcp congestion control is changing it's congestion window
+[instead of guessing](https://github.com/sirupsen/initcwnd) and modprobe tcpprobe wasn't an option.
+cwnd could also be retrieved via netlink (the way ss does it),
+but https://www.brendangregg.com/blog/2018-03-22/tcp-tracepoints.html defintely convinced me tracing approach
+is better. Reading and playing around with https://github.com/iovisor/bcc/ and reading the kernel code
+also gave me some understanding how tracepoints work.
+
 
 ## Prerequisites
 

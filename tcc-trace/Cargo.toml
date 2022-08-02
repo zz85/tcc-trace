@@ -7,6 +7,7 @@ publish = false
 [dependencies]
 aya = { version = ">=0.11", features=["async_tokio"] }
 aya-log = "0.1"
+bytes = "1.2"
 tcc-trace-common = { path = "../tcc-trace-common", features=["user"] }
 anyhow = "1.0.42"
 clap = { version = "3.1", features = ["derive"] }

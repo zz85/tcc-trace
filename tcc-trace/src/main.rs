@@ -1,10 +1,14 @@
+use aya::maps::perf::AsyncPerfEventArray;
 use aya::programs::TracePoint;
+use aya::util::online_cpus;
 use aya::{include_bytes_aligned, Bpf};
 use aya_log::BpfLogger;
+use bytes::BytesMut;
 use clap::Parser;
 use log::info;
 use simplelog::{ColorChoice, ConfigBuilder, LevelFilter, TermLogger, TerminalMode};
-use tokio::signal;
+use tcc_trace_common::TcpProbe;
+use tokio::{signal, task};
 
 #[derive(Debug, Parser)]
 struct Opt {}
@@ -39,6 +43,40 @@ async fn main() -> Result<(), anyhow::Error> {
     let program: &mut TracePoint = bpf.program_mut("tcc_trace").unwrap().try_into()?;
     program.load()?;
     program.attach("tcp", "tcp_probe")?;
+
+    let mut perf_array = AsyncPerfEventArray::try_from(bpf.map_mut("TCP_PROBES")?)?;
+    for cpu_id in online_cpus()? {
+        //
+
+        let mut buf = perf_array.open(cpu_id, None)?;
+
+        //
+
+        task::spawn(async move {
+            //
+
+            let mut buffers = (0..10)
+                .map(|_| BytesMut::with_capacity(1024))
+                .collect::<Vec<_>>();
+
+            loop {
+                //
+
+                let events = buf.read_events(&mut buffers).await.unwrap();
+                for i in 0..events.read {
+                    let buf = &mut buffers[i];
+                    let ptr = buf.as_ptr() as *const TcpProbe;
+                    //
+
+                    let probe = unsafe { ptr.read_unaligned() };
+
+                    // let src_addr = net::Ipv4Addr::from(data.ipv4_address);
+
+                    println!("LOG: SRC {}, ACTION {}", probe.data_len, probe.dport);
+                }
+            }
+        });
+    }
 
     info!("Waiting for Ctrl-C...");
     signal::ctrl_c().await?;
