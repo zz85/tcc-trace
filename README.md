@@ -39,6 +39,18 @@ but https://www.brendangregg.com/blog/2018-03-22/tcp-tracepoints.html defintely 
 is better. Reading and playing around with https://github.com/iovisor/bcc/ and reading the kernel code
 also gave me some understanding how tracepoints work.
 
+## Done
+- [x] Basic TCP Probing via Tracepoint
+- [x] Display cwnd, ssthresh, sttt, length
+- [x] Filtering based on IP or port number
+
+## TODOs
+- [ ] Test binaries on different hosts
+- [ ] Logging to trace file
+- [ ] Nicer colors, UI
+- [ ] Identify and run timer for individual connections
+- [ ] Trace other pieces of connection properties
+- [ ] In kernel filtering optimization
 
 ## Prerequisites
 

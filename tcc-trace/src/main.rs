@@ -25,33 +25,38 @@ struct Opt {
     /// Filter by ip (shows all ips by default)
     #[clap(short, long, value_parser)]
     ip: Option<IpAddr>,
+
+    #[clap(short, long, value_parser)]
+    debug: bool,
 }
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    let Opt { port, ip } = Opt::parse();
+    let Opt { port, ip, debug } = Opt::parse();
 
     if let Some(ip) = ip {
-        info!("Filtering IP: {:?}", ip);
+        println!("Filtering IP: {:?}", ip);
     }
 
     if let Some(port) = port {
-        info!("Filtering port: {}", port);
+        println!("Filtering port: {}", port);
     }
 
     if (None, None) == (port, ip) {
-        info!("No filters...");
+        println!("No filters...");
     }
 
-    // TermLogger::init(
-    //     LevelFilter::Debug,
-    //     ConfigBuilder::new()
-    //         .set_target_level(LevelFilter::Error)
-    //         .set_location_level(LevelFilter::Error)
-    //         .build(),
-    //     TerminalMode::Mixed,
-    //     ColorChoice::Auto,
-    // )?;
+    if debug {
+        TermLogger::init(
+            LevelFilter::Debug,
+            ConfigBuilder::new()
+                .set_target_level(LevelFilter::Error)
+                .set_location_level(LevelFilter::Error)
+                .build(),
+            TerminalMode::Mixed,
+            ColorChoice::Auto,
+        )?;
+    }
 
     // This will include your eBPF object file as raw bytes at compile-time and load it at
     // runtime. This approach is recommended for most real-world use cases. If you would
@@ -72,7 +77,7 @@ async fn main() -> Result<(), anyhow::Error> {
     program.load()?;
     program.attach("tcp", "tcp_probe")?;
     println!(
-        "BPF Tracepoint attached {}ms",
+        "TCP Probe attached via BPF Tracepoint in {:.3}ms",
         start.elapsed().as_secs_f64() * 1000.0
     );
 
@@ -83,7 +88,7 @@ async fn main() -> Result<(), anyhow::Error> {
     for cpu_id in online_cpus()? {
         let event_count = event_count.clone();
         let filtered_count = filtered_count.clone();
-        let start = start.clone();
+
 
         let mut buf = perf_array.open(cpu_id, None)?;
 
@@ -144,21 +149,22 @@ async fn main() -> Result<(), anyhow::Error> {
                     }
 
                     println!(
-                        "{:.3}| {:?}.{} > {:?}.{} | snd_nxt {} snd_una {} snd_cwnd {} ssthresh {} snd_wnd {} srtt {:3} rcv_wnd {} sock_cookie {} length {}",
+                        "{:.3}| {:?}.{} > {:?}.{} | snd_cwnd {} ssthresh {} snd_wnd {} srtt {:3} rcv_wnd {} length {}",
                         start.elapsed().as_secs_f64() * 1000.0,
                         source_ip,
                         sport,
                         dest_ip,
                         dport,
-                        snd_nxt,
-                        snd_una,
                         snd_cwnd,
                         ssthresh,
-                        snd_wnd, srtt, rcv_wnd, sock_cookie,
+                        snd_wnd, srtt, rcv_wnd,
                         data_len,
-
                     );
 
+                    // snd_nxt {} snd_una {}  sock_cookie {}
+                    // snd_nxt,
+                    // snd_una,
+                    // sock_cookie,
                     // "common_type {} common_flags {} common_preempt_count {} common_pid {}",
                     // common_type,
                     // common_flags,
