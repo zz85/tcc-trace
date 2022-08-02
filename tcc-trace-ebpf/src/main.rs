@@ -6,6 +6,7 @@ use aya_bpf::{
     maps::PerfEventArray,
     programs::TracePointContext,
 };
+use aya_log_ebpf::info;
 use tcc_trace_common::TcpProbe;
 
 #[map]
@@ -22,63 +23,16 @@ pub fn tcc_trace(ctx: TracePointContext) -> u64 {
 unsafe fn try_tcc_trace(ctx: TracePointContext) -> Result<u64, i64> {
     let probe: TcpProbe = ctx.read_at(0)?;
 
-    // As an optimization, filtering can be done in kernel space
-    // for now, just send to user space
-
-    let TcpProbe {
-        common_type,
-        common_flags,
-        common_preempt_count,
-        common_pid,
-        saddr,
-        daddr,
-        sport,
-        dport,
-        mark,
-        data_len,
-        snd_nxt,
-        snd_una,
-        snd_cwnd,
-        ssthresh,
-        snd_wnd,
-        srtt,
-        rcv_wnd,
-        sock_cookie,
-    } = probe;
+    let TcpProbe { sport, dport, .. } = probe;
 
     let target_port = 443;
+    if sport == target_port || dport == target_port {
+        // As an optimization, filtering can be done in kernel space
+        // Currently, we'll make do with sending and filtering in user space
+    }
 
     // send perf event
     TCP_PROBES.output(&ctx, &probe, 0);
-
-    if sport == target_port || dport == target_port {
-
-        // info!(
-        //     &ctx,
-        //     "common_type {} common_flags {} common_preempt_count {} common_pid {}",
-        //     common_type,
-        //     common_flags,
-        //     common_preempt_count,
-        //     i32::from_be(common_pid)
-        // );
-
-        // info!(&ctx, "tracepoint tcp_probe called");
-        // get(saddr, &ctx);
-        // get(daddr, &ctx);
-
-        // info!(
-        //     &ctx,
-        //     "sport {} dport {} mark {} data len {}", sport, dport, mark, data_len
-        // );
-        // info!(
-        //     &ctx,
-        //     "snd_nxt {} snd_una {} snd_cwnd {} ssthresh {}", snd_nxt, snd_una, snd_cwnd, ssthresh
-        // );
-        // info!(
-        //     &ctx,
-        //     "snd_wnd {} srtt {} rcv_wnd {} sock_cookie {}", snd_wnd, srtt, rcv_wnd, sock_cookie
-        // );
-    }
 
     Ok(0)
 }

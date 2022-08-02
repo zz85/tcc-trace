@@ -48,35 +48,62 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let mut perf_array = AsyncPerfEventArray::try_from(bpf.map_mut("TCP_PROBES")?)?;
     for cpu_id in online_cpus()? {
-        // println!("CPU {}", cpu_id);
         let mut buf = perf_array.open(cpu_id, None)?;
 
         task::spawn(async move {
-            //
-
             let mut buffers = (0..10)
                 .map(|_| BytesMut::with_capacity(1024))
                 .collect::<Vec<_>>();
 
             loop {
-                //
-
                 let events = buf.read_events(&mut buffers).await.unwrap();
                 for i in 0..events.read {
                     let buf = &mut buffers[i];
                     let ptr = buf.as_ptr() as *const TcpProbe;
-                    //
-
                     let probe = unsafe { ptr.read_unaligned() };
 
+                    // Process probe
+                    let TcpProbe {
+                        // common_type,
+                        // common_flags,
+                        // common_preempt_count,
+                        // common_pid,
+                        saddr,
+                        daddr,
+                        // sport,
+                        // dport,
+                        // mark,
+                        data_len,
+                        snd_nxt,
+                        snd_una,
+                        snd_cwnd,
+                        ssthresh,
+                        snd_wnd,
+                        srtt,
+                        rcv_wnd,
+                        sock_cookie,
+                        ..
+                    } = probe;
+
                     info!(
-                        "[{:?} -> {:?}] {} -> {}, Len: [{}]",
-                        get(probe.saddr).unwrap(),
-                        get(probe.daddr).unwrap(),
-                        probe.sport,
-                        probe.dport,
-                        probe.data_len,
+                        "{:?} > {:?} | snd_nxt {} snd_una {} snd_cwnd {} ssthresh {} snd_wnd {} srtt {} rcv_wnd {} sock_cookie {} length {}",
+                        format_socket(saddr).unwrap(),
+                        format_socket(daddr).unwrap(),
+                        snd_nxt,
+                        snd_una,
+                        snd_cwnd,
+                        ssthresh,
+                        snd_wnd, srtt, rcv_wnd, sock_cookie,
+                        data_len,
+
                     );
+
+                    // "common_type {} common_flags {} common_preempt_count {} common_pid {}",
+                    // common_type,
+                    // common_flags,
+                    // common_preempt_count,
+                    // i32::from_be(common_pid)
+                    // mark
                 }
             }
         });
@@ -89,7 +116,7 @@ async fn main() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-fn get(sock: socket) -> Option<SocketAddr> {
+fn format_socket(sock: socket) -> Option<SocketAddr> {
     unsafe {
         match sock.v6.sin6_family {
             AF_INET => {
