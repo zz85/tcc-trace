@@ -3,68 +3,7 @@
 
 use aya_bpf::{macros::tracepoint, programs::TracePointContext};
 use aya_log_ebpf::info;
-
-// sockaddr_in6
-// uapi (x), rustix (x), libc (X), relibc (X), aya-gen, nix (X)
-
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct sockaddr {
-    pub sa_family: AddressFamily,
-    pub port: u16,
-    pub addr: [u8; 4],
-    pub zeros: [u8; 8], // just padding
-}
-
-pub type AddressFamily = u16;
-
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub struct sockaddr_in6 {
-    pub sin6_family: AddressFamily,
-    pub sin6_port: u16,
-    pub sin6_flowinfo: u32,
-    pub sin6_addr: in6_addr,
-    pub sin6_scope_id: u32,
-}
-
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub struct in6_addr {
-    pub s6_addr: [u8; 16],
-    // some fields omitted
-}
-
-#[repr(C)]
-#[derive(Copy, Clone)]
-union sock {
-    v4: sockaddr,
-    v6: sockaddr_in6,
-}
-
-#[repr(C)]
-#[derive(Copy, Clone)]
-
-struct TcpProbe {
-    common_type: u16,
-    common_flags: u8,
-    common_preempt_count: u8,
-    common_pid: i32,
-    saddr: sock,
-    daddr: sock,
-    sport: u16,
-    dport: u16,
-    mark: u32,
-    data_len: u16,
-    snd_nxt: u32,
-    snd_una: u32,
-    snd_cwnd: u32,
-    ssthresh: u32,
-    snd_wnd: u32,
-    srtt: u32,
-    rcv_wnd: u32,
-    sock_cookie: u64,
-}
+use tcc_trace_common::{sock, TcpProbe};
 
 #[tracepoint(name = "tcc_trace")]
 pub fn tcc_trace(ctx: TracePointContext) -> u64 {
@@ -121,43 +60,7 @@ unsafe fn get(sock: sock, ctx: &TracePointContext) {
     }
 }
 
-const SADDR_OFFSET: usize = 8;
-
-const AF_INET: AddressFamily = 2;
-const AF_INET6: AddressFamily = 10;
-
 unsafe fn try_tcc_trace(ctx: TracePointContext) -> Result<u64, u64> {
-    /*
-    https://github.com/libpnet/libpnet/blob/44f17c8c570caf244b0df52e69bbda7b545fb7f3/pnet_sys/src/unix.rs#L169
-
-    https://elixir.bootlin.com/linux/v4.0/source/net/ipv4/tcp_probe.c
-        % sudo cat /sys/kernel/debug/tracing/events/tcp/tcp_probe/format
-    name: tcp_probe
-    ID: 624
-    format:
-        field:unsigned short common_type;   offset:0;   size:2; signed:0;
-        field:unsigned char common_flags;   offset:2;   size:1; signed:0;
-        field:unsigned char common_preempt_count;   offset:3;   size:1; signed:0;
-        field:int common_pid;   offset:4;   size:4; signed:1;
-
-        field:__u8 saddr[sizeof(struct sockaddr_in6)];  offset:8;   size:28;    signed:0;
-        field:__u8 daddr[sizeof(struct sockaddr_in6)];  offset:36;  size:28;    signed:0;
-        field:__u16 sport;  offset:64;  size:2; signed:0;
-        field:__u16 dport;  offset:66;  size:2; signed:0;
-        field:__u32 mark;   offset:68;  size:4; signed:0;
-        field:__u16 data_len;   offset:72;  size:2; signed:0;
-        field:__u32 snd_nxt;    offset:76;  size:4; signed:0;
-        field:__u32 snd_una;    offset:80;  size:4; signed:0;
-        field:__u32 snd_cwnd;   offset:84;  size:4; signed:0;
-        field:__u32 ssthresh;   offset:88;  size:4; signed:0;
-        field:__u32 snd_wnd;    offset:92;  size:4; signed:0;
-        field:__u32 srtt;   offset:96;  size:4; signed:0;
-        field:__u32 rcv_wnd;    offset:100; size:4; signed:0;
-        field:__u64 sock_cookie;    offset:104; size:8; signed:0;
-
-    print fmt: "src=%pISpc dest=%pISpc mark=%#x data_len=%d snd_nxt=%#x snd_una=%#x snd_cwnd=%u ssthresh=%u snd_wnd=%u srtt=%u rcv_wnd=%u sock_cookie=%llx", REC->saddr, REC->daddr, REC->mark, REC->data_len, REC->snd_nxt, REC->snd_una, REC->snd_cwnd, REC->ssthresh, REC->snd_wnd, REC->srtt, REC->rcv_wnd, REC->sock_cookie
-        */
-
     let probe: TcpProbe = ctx.read_at(0).map_err(|e| e as u64)?;
 
     let TcpProbe {
