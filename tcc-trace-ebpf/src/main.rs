@@ -46,6 +46,10 @@ union sock {
 #[derive(Copy, Clone)]
 
 struct TcpProbe {
+    common_type: u16,
+    common_flags: u8,
+    common_preempt_count: u8,
+    common_pid: i32,
     saddr: sock,
     daddr: sock,
     sport: u16,
@@ -74,15 +78,15 @@ unsafe fn get(sock: sock, ctx: &TracePointContext) {
     match sock.v6.sin6_family {
         AF_INET => {
             let addr = sock.v4;
-            info!(
-                ctx,
-                "IP4 source {}.{}.{}.{} port {} ",
-                addr.addr[0],
-                addr.addr[1],
-                addr.addr[2],
-                addr.addr[3],
-                u16::from_be(addr.port)
-            );
+            // info!(
+            //     ctx,
+            //     "IP4 source {}.{}.{}.{} port {} ",
+            //     addr.addr[0],
+            //     addr.addr[1],
+            //     addr.addr[2],
+            //     addr.addr[3],
+            //     u16::from_be(addr.port)
+            // );
         }
         AF_INET6 => {
             let addr = sock.v6;
@@ -92,26 +96,26 @@ unsafe fn get(sock: sock, ctx: &TracePointContext) {
                 addr.sin6_family,
                 u16::from_be(addr.sin6_port)
             );
-            info!(
-                ctx,
-                "{} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} ",
-                addr.sin6_addr.s6_addr[0],
-                addr.sin6_addr.s6_addr[1],
-                addr.sin6_addr.s6_addr[2],
-                addr.sin6_addr.s6_addr[3],
-                addr.sin6_addr.s6_addr[4],
-                addr.sin6_addr.s6_addr[5],
-                addr.sin6_addr.s6_addr[6],
-                addr.sin6_addr.s6_addr[7],
-                addr.sin6_addr.s6_addr[8],
-                addr.sin6_addr.s6_addr[9],
-                addr.sin6_addr.s6_addr[10],
-                addr.sin6_addr.s6_addr[11],
-                addr.sin6_addr.s6_addr[12],
-                addr.sin6_addr.s6_addr[13],
-                addr.sin6_addr.s6_addr[14],
-                addr.sin6_addr.s6_addr[15],
-            );
+            //     info!(
+            //         ctx,
+            //         "{} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} ",
+            //         addr.sin6_addr.s6_addr[0],
+            //         addr.sin6_addr.s6_addr[1],
+            //         addr.sin6_addr.s6_addr[2],
+            //         addr.sin6_addr.s6_addr[3],
+            //         addr.sin6_addr.s6_addr[4],
+            //         addr.sin6_addr.s6_addr[5],
+            //         addr.sin6_addr.s6_addr[6],
+            //         addr.sin6_addr.s6_addr[7],
+            //         addr.sin6_addr.s6_addr[8],
+            //         addr.sin6_addr.s6_addr[9],
+            //         addr.sin6_addr.s6_addr[10],
+            //         addr.sin6_addr.s6_addr[11],
+            //         addr.sin6_addr.s6_addr[12],
+            //         addr.sin6_addr.s6_addr[13],
+            //         addr.sin6_addr.s6_addr[14],
+            //         addr.sin6_addr.s6_addr[15],
+            //     );
         }
         _ => {}
     }
@@ -124,7 +128,6 @@ const AF_INET6: AddressFamily = 10;
 
 unsafe fn try_tcc_trace(ctx: TracePointContext) -> Result<u64, u64> {
     /*
-
     https://github.com/libpnet/libpnet/blob/44f17c8c570caf244b0df52e69bbda7b545fb7f3/pnet_sys/src/unix.rs#L169
 
     https://elixir.bootlin.com/linux/v4.0/source/net/ipv4/tcp_probe.c
@@ -155,9 +158,13 @@ unsafe fn try_tcc_trace(ctx: TracePointContext) -> Result<u64, u64> {
     print fmt: "src=%pISpc dest=%pISpc mark=%#x data_len=%d snd_nxt=%#x snd_una=%#x snd_cwnd=%u ssthresh=%u snd_wnd=%u srtt=%u rcv_wnd=%u sock_cookie=%llx", REC->saddr, REC->daddr, REC->mark, REC->data_len, REC->snd_nxt, REC->snd_una, REC->snd_cwnd, REC->ssthresh, REC->snd_wnd, REC->srtt, REC->rcv_wnd, REC->sock_cookie
         */
 
-    let probe: TcpProbe = ctx.read_at(SADDR_OFFSET).map_err(|e| e as u64)?;
+    let probe: TcpProbe = ctx.read_at(0).map_err(|e| e as u64)?;
 
     let TcpProbe {
+        common_type,
+        common_flags,
+        common_preempt_count,
+        common_pid,
         saddr,
         daddr,
         sport,
@@ -177,22 +184,31 @@ unsafe fn try_tcc_trace(ctx: TracePointContext) -> Result<u64, u64> {
     let target_port = 443;
 
     if sport == target_port || dport == target_port {
-        info!(&ctx, "tracepoint tcp_probe called");
-        get(saddr, &ctx);
-        get(daddr, &ctx);
+        info!(
+            &ctx,
+            "common_type {} common_flags {} common_preempt_count {} common_pid {}",
+            common_type,
+            common_flags,
+            common_preempt_count,
+            i32::from_be(common_pid)
+        );
+
+        // info!(&ctx, "tracepoint tcp_probe called");
+        // get(saddr, &ctx);
+        // get(daddr, &ctx);
 
         info!(
             &ctx,
             "sport {} dport {} mark {} data len {}", sport, dport, mark, data_len
         );
-        info!(
-            &ctx,
-            "snd_nxt {} snd_una {} snd_cwnd {} ssthresh {}", snd_nxt, snd_una, snd_cwnd, ssthresh
-        );
-        info!(
-            &ctx,
-            "snd_wnd {} srtt {} rcv_wnd {} sock_cookie {}", snd_wnd, srtt, rcv_wnd, sock_cookie
-        );
+        // info!(
+        //     &ctx,
+        //     "snd_nxt {} snd_una {} snd_cwnd {} ssthresh {}", snd_nxt, snd_una, snd_cwnd, ssthresh
+        // );
+        // info!(
+        //     &ctx,
+        //     "snd_wnd {} srtt {} rcv_wnd {} sock_cookie {}", snd_wnd, srtt, rcv_wnd, sock_cookie
+        // );
     }
 
     Ok(0)
