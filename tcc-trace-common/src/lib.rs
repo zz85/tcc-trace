@@ -45,8 +45,8 @@ pub struct TcpProbe {
     pub common_flags: u8,
     pub common_preempt_count: u8,
     pub common_pid: i32,
-    pub saddr: sock,
-    pub daddr: sock,
+    pub saddr: socket,
+    pub daddr: socket,
     pub sport: u16,
     pub dport: u16,
     pub mark: u32,
@@ -91,7 +91,7 @@ pub struct in6_addr {
 
 #[repr(C)]
 #[derive(Copy, Clone)]
-pub union sock {
+pub union socket {
     pub v4: sockaddr,
     pub v6: sockaddr_in6,
 }
