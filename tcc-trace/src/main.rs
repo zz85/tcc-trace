@@ -12,7 +12,7 @@ use bytes::BytesMut;
 use clap::Parser;
 use log::info;
 use simplelog::{ColorChoice, ConfigBuilder, LevelFilter, TermLogger, TerminalMode};
-use tcc_trace_common::{socket, TcpProbe, AF_INET, AF_INET6};
+use tcc_trace_common::{socket, TcpProbe, TracePayload, AF_INET, AF_INET6};
 use tokio::{signal, task};
 
 /// Congestion Control tracer for TCP connections
@@ -85,10 +85,11 @@ async fn main() -> Result<(), anyhow::Error> {
     let filtered_count = Arc::new(AtomicU64::new(0));
 
     let mut perf_array = AsyncPerfEventArray::try_from(bpf.map_mut("TCP_PROBES")?)?;
+
+
     for cpu_id in online_cpus()? {
         let event_count = event_count.clone();
         let filtered_count = filtered_count.clone();
-
 
         let mut buf = perf_array.open(cpu_id, None)?;
 
@@ -102,9 +103,14 @@ async fn main() -> Result<(), anyhow::Error> {
                 event_count.fetch_add(events.read as u64 + events.lost as u64, Ordering::Relaxed);
                 for i in 0..events.read {
                     let buf = &mut buffers[i];
-                    let ptr = buf.as_ptr() as *const TcpProbe;
-                    let probe = unsafe { ptr.read_unaligned() };
+                    let ptr = buf.as_ptr() as *const TracePayload;
+                    let payload = unsafe { ptr.read_unaligned() };
 
+                    let TracePayload {
+                        time,
+                        offset_time,
+                        probe,
+                    } = payload;
                     // Process probe
                     let TcpProbe {
                         // common_type,
@@ -149,7 +155,8 @@ async fn main() -> Result<(), anyhow::Error> {
                     }
 
                     println!(
-                        "{:.3}| {:?}.{} > {:?}.{} | snd_cwnd {} ssthresh {} snd_wnd {} srtt {:3} rcv_wnd {} length {}",
+                        "{} {}\n{:.3}| {:?}.{} > {:?}.{} | snd_cwnd {} ssthresh {} snd_wnd {} srtt {:3} rcv_wnd {} length {}",
+                        time, offset_time,
                         start.elapsed().as_secs_f64() * 1000.0,
                         source_ip,
                         sport,

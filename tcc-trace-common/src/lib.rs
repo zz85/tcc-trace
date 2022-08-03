@@ -1,5 +1,11 @@
 #![no_std]
 
+pub struct TracePayload {
+    pub time: u64,
+    pub offset_time: u64,
+    pub probe: TcpProbe,
+}
+
 pub const SADDR_OFFSET: usize = 8;
 pub const AF_INET: AddressFamily = 2;
 pub const AF_INET6: AddressFamily = 10;
