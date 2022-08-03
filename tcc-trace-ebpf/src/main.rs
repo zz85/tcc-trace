@@ -2,7 +2,7 @@
 #![no_main]
 
 use aya_bpf::{
-    helpers::{bpf_ktime_get_boot_ns, bpf_ktime_get_ns},
+    helpers::{bpf_ktime_get_ns},
     macros::{map, tracepoint},
     maps::PerfEventArray,
     programs::TracePointContext,

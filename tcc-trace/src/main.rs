@@ -81,7 +81,7 @@ async fn main() -> Result<(), anyhow::Error> {
         start.elapsed().as_secs_f64() * 1000.0
     );
 
-    let handler = Handler::new(ip, port);
+    let mut handler = Handler::new(ip, port);
     let event_count = Arc::new(AtomicU64::new(0));
     let filtered_count = Arc::new(AtomicU64::new(0));
     let mut perf_array = AsyncPerfEventArray::try_from(bpf.map_mut("TCP_PROBES")?)?;
@@ -141,6 +141,7 @@ struct Handler {
     port: Option<u16>,
     ip: Option<IpAddr>,
     start: Instant,
+    cache: std::collections::HashMap<(SocketAddr, SocketAddr), Instant>,
 }
 
 impl Handler {
@@ -149,9 +150,10 @@ impl Handler {
             ip,
             port,
             start: Instant::now(),
+            cache: Default::default(),
         }
     }
-    fn process_event(&self, payload: TracePayload) {
+    fn process_event(&mut self, payload: TracePayload) {
         let TracePayload {
             time,
             offset_time,
@@ -200,10 +202,13 @@ impl Handler {
             }
         }
 
+        let first_seen = self.cache.entry((source, dest)).or_insert(Instant::now());
+
         println!(
-        "{} {}\n{:.3}| {:?}.{} > {:?}.{} | snd_cwnd {} ssthresh {} snd_wnd {} srtt {:3} rcv_wnd {} length {}",
+        "{} {}\n{:.3} ms| {:?}.{} > {:?}.{} | snd_cwnd {} ssthresh {} snd_wnd {} srtt {:3} rcv_wnd {} length {}",
         time, offset_time,
-        self.start.elapsed().as_secs_f64() * 1000.0,
+        // self.start.elapsed().as_secs_f64() * 1000.0,
+        first_seen.elapsed().as_secs_f64() * 1000.0,
         source_ip,
         sport,
         dest_ip,
