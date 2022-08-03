@@ -1,6 +1,6 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{mpsc, Arc};
 use std::time::Instant;
 
 use aya::maps::perf::AsyncPerfEventArray;
@@ -81,17 +81,25 @@ async fn main() -> Result<(), anyhow::Error> {
         start.elapsed().as_secs_f64() * 1000.0
     );
 
+    let handler = Handler::new(ip, port);
     let event_count = Arc::new(AtomicU64::new(0));
     let filtered_count = Arc::new(AtomicU64::new(0));
-
     let mut perf_array = AsyncPerfEventArray::try_from(bpf.map_mut("TCP_PROBES")?)?;
 
+    let (tx, rx) = mpsc::channel();
+
+    task::spawn(async move {
+        while let Ok(payload) = rx.recv() {
+            handler.process_event(payload);
+        }
+    });
 
     for cpu_id in online_cpus()? {
         let event_count = event_count.clone();
         let filtered_count = filtered_count.clone();
 
         let mut buf = perf_array.open(cpu_id, None)?;
+        let tx = tx.clone();
 
         task::spawn(async move {
             let mut buffers = (0..10)
@@ -106,78 +114,7 @@ async fn main() -> Result<(), anyhow::Error> {
                     let ptr = buf.as_ptr() as *const TracePayload;
                     let payload = unsafe { ptr.read_unaligned() };
 
-                    let TracePayload {
-                        time,
-                        offset_time,
-                        probe,
-                    } = payload;
-                    // Process probe
-                    let TcpProbe {
-                        // common_type,
-                        // common_flags,
-                        // common_preempt_count,
-                        // common_pid,
-                        saddr,
-                        daddr,
-                        sport,
-                        dport,
-                        // mark,
-                        data_len,
-                        snd_nxt,
-                        snd_una,
-                        snd_cwnd,
-                        ssthresh,
-                        snd_wnd,
-                        srtt,
-                        rcv_wnd,
-                        sock_cookie,
-                        ..
-                    } = probe;
-
-                    if let Some(port) = port {
-                        // if port is set, filter connections that doesn't match
-                        if sport != port && dport != port {
-                            filtered_count.fetch_add(1, Ordering::Relaxed);
-                            continue;
-                        }
-                    }
-
-                    let source = format_socket(saddr).unwrap();
-                    let dest = format_socket(daddr).unwrap();
-                    let source_ip = source.ip();
-                    let dest_ip = dest.ip();
-
-                    if let Some(ip) = ip {
-                        if ip != source_ip && ip != dest_ip {
-                            filtered_count.fetch_add(1, Ordering::Relaxed);
-                            continue;
-                        }
-                    }
-
-                    println!(
-                        "{} {}\n{:.3}| {:?}.{} > {:?}.{} | snd_cwnd {} ssthresh {} snd_wnd {} srtt {:3} rcv_wnd {} length {}",
-                        time, offset_time,
-                        start.elapsed().as_secs_f64() * 1000.0,
-                        source_ip,
-                        sport,
-                        dest_ip,
-                        dport,
-                        snd_cwnd,
-                        ssthresh,
-                        snd_wnd, srtt, rcv_wnd,
-                        data_len,
-                    );
-
-                    // snd_nxt {} snd_una {}  sock_cookie {}
-                    // snd_nxt,
-                    // snd_una,
-                    // sock_cookie,
-                    // "common_type {} common_flags {} common_preempt_count {} common_pid {}",
-                    // common_type,
-                    // common_flags,
-                    // common_preempt_count,
-                    // i32::from_be(common_pid)
-                    // mark
+                    tx.send(payload).unwrap();
                 }
             }
         });
@@ -198,6 +135,96 @@ async fn main() -> Result<(), anyhow::Error> {
     );
 
     Ok(())
+}
+
+struct Handler {
+    port: Option<u16>,
+    ip: Option<IpAddr>,
+    start: Instant,
+}
+
+impl Handler {
+    fn new(ip: Option<IpAddr>, port: Option<u16>) -> Self {
+        Self {
+            ip,
+            port,
+            start: Instant::now(),
+        }
+    }
+    fn process_event(&self, payload: TracePayload) {
+        let TracePayload {
+            time,
+            offset_time,
+            probe,
+        } = payload;
+        // Process probe
+        let TcpProbe {
+            // common_type,
+            // common_flags,
+            // common_preempt_count,
+            // common_pid,
+            saddr,
+            daddr,
+            sport,
+            dport,
+            // mark,
+            data_len,
+            snd_nxt,
+            snd_una,
+            snd_cwnd,
+            ssthresh,
+            snd_wnd,
+            srtt,
+            rcv_wnd,
+            sock_cookie,
+            ..
+        } = probe;
+
+        if let Some(port) = self.port {
+            // if port is set, filter connections that doesn't match
+            if sport != port && dport != port {
+                // filtered_count.fetch_add(1, Ordering::Relaxed);
+                return;
+            }
+        }
+
+        let source = format_socket(saddr).unwrap();
+        let dest = format_socket(daddr).unwrap();
+        let source_ip = source.ip();
+        let dest_ip = dest.ip();
+
+        if let Some(ip) = self.ip {
+            if ip != source_ip && ip != dest_ip {
+                // filtered_count.fetch_add(1, Ordering::Relaxed);
+                return;
+            }
+        }
+
+        println!(
+        "{} {}\n{:.3}| {:?}.{} > {:?}.{} | snd_cwnd {} ssthresh {} snd_wnd {} srtt {:3} rcv_wnd {} length {}",
+        time, offset_time,
+        self.start.elapsed().as_secs_f64() * 1000.0,
+        source_ip,
+        sport,
+        dest_ip,
+        dport,
+        snd_cwnd,
+        ssthresh,
+        snd_wnd, srtt, rcv_wnd,
+        data_len,
+    );
+
+        // snd_nxt {} snd_una {}  sock_cookie {}
+        // snd_nxt,
+        // snd_una,
+        // sock_cookie,
+        // "common_type {} common_flags {} common_preempt_count {} common_pid {}",
+        // common_type,
+        // common_flags,
+        // common_preempt_count,
+        // i32::from_be(common_pid)
+        // mark
+    }
 }
 
 fn format_socket(sock: socket) -> Option<SocketAddr> {
