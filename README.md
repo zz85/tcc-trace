@@ -16,22 +16,21 @@ OPTIONS:
     -i, --ip <IP>        Filter by ip (shows all ips by default)
     -p, --port <PORT>    Filter by port number (display all ports by default)
 
-tcc-trace$ sudo target/release/tcc-trace --port 22
+tcc-trace$ sudo target/release/tcc-trace --port 443
 
-Filtering port: 22
-TCP Probe attached via BPF Tracepoint in 1.456ms
+Filtering port: 443
+TCP Probe attached via BPF Tracepoint in 1.452ms
 Waiting for Ctrl-C...
-k:22329653706207571 21.992ms | 0.002 ms| 172.31.46.125.22 > 52.95.4.0.29736 | snd_cwnd 10 ssthresh 46 snd_wnd 261632 srtt 77035 rcv_wnd 56576 length 0
-k:22329653729933673 45.719ms | 0.001 ms| 172.31.46.125.22 > 52.95.4.0.9249 | snd_cwnd 10 ssthresh 24 snd_wnd 131072 srtt 72946 rcv_wnd 93952 length 0
-k:22329653735191663 50.977ms | 5.237 ms| 172.31.46.125.22 > 52.95.4.0.9249 | snd_cwnd 11 ssthresh 24 snd_wnd 131072 srtt 72867 rcv_wnd 93952 length 0
-k:22329653735996878 51.782ms | 29.746 ms| 172.31.46.125.22 > 52.95.4.0.29736 | snd_cwnd 11 ssthresh 46 snd_wnd 261632 srtt 76853 rcv_wnd 56576 length 0
-k:22329653742158975 57.944ms | 35.912 ms| 172.31.46.125.22 > 52.95.4.0.29736 | snd_cwnd 12 ssthresh 46 snd_wnd 261632 srtt 77035 rcv_wnd 56576 length 0
-k:22329653747879769 63.665ms | 17.925 ms| 172.31.46.125.22 > 52.95.4.0.9249 | snd_cwnd 12 ssthresh 24 snd_wnd 131072 srtt 72908 rcv_wnd 93952 length 0
-k:22329653754174690 69.960ms | 47.925 ms| 172.31.46.125.22 > 52.95.4.0.29736 | snd_cwnd 13 ssthresh 46 snd_wnd 261632 srtt 77432 rcv_wnd 56576 length 0
-k:22329653757416239 73.201ms | 27.458 ms| 172.31.46.125.22 > 52.95.4.0.9249 | snd_cwnd 13 ssthresh 24 snd_wnd 131072 srtt 72714 rcv_wnd 93952 length 0
-k:22329653760128801 75.914ms | 30.170 ms| 172.31.46.125.22 > 52.95.4.0.9249 | snd_cwnd 14 ssthresh 24 snd_wnd 131072 srtt 72765 rcv_wnd 93952 length 0
-k:22329653760940866 76.726ms | 54.689 ms| 172.31.46.125.22 > 52.95.4.0.29736 | snd_cwnd 14 ssthresh 46 snd_wnd 261632 srtt 77465 rcv_wnd 56576 length 0
-k:22329653766101023 81.886ms | 59.883 ms| 172.31.46.125.22 > 52.95.4.0.29736 | snd_cwnd 15 ssthresh 46 snd_wnd 261632 srtt 77368 rcv_wnd 56576 length 0
+1.72180s | 0.000 ms| 2600:1f16:bb9:f90b:5f12:132a:4ab3:6493.51114 > 2607:f8b0:4009:806::200e.443 | snd_cwnd 10 ssthresh 2147483647 snd_wnd 65535 srtt 16980 rcv_wnd 62592 length 0
+1.73081s | 9.009 ms| 2600:1f16:bb9:f90b:5f12:132a:4ab3:6493.51114 > 2607:f8b0:4009:806::200e.443 | snd_cwnd 10 ssthresh 2147483647 snd_wnd 66816 srtt 16976 rcv_wnd 62592 length 2416
+1.73084s | 9.042 ms| 2600:1f16:bb9:f90b:5f12:132a:4ab3:6493.51114 > 2607:f8b0:4009:806::200e.443 | snd_cwnd 10 ssthresh 2147483647 snd_wnd 66816 srtt 16976 rcv_wnd 60288 length 2416
+1.73087s | 9.076 ms| 2600:1f16:bb9:f90b:5f12:132a:4ab3:6493.51114 > 2607:f8b0:4009:806::200e.443 | snd_cwnd 10 ssthresh 2147483647 snd_wnd 66816 srtt 16976 rcv_wnd 57984 length 1858
+1.74927s | 27.476 ms| 2600:1f16:bb9:f90b:5f12:132a:4ab3:6493.51114 > 2607:f8b0:4009:806::200e.443 | snd_cwnd 10 ssthresh 2147483647 snd_wnd 66816 srtt 16976 rcv_wnd 56704 length 648
+1.74999s | 28.188 ms| 2600:1f16:bb9:f90b:5f12:132a:4ab3:6493.51114 > 2607:f8b0:4009:806::200e.443 | snd_cwnd 10 ssthresh 2147483647 snd_wnd 66816 srtt 17001 rcv_wnd 56704 length 31
+1.76130s | 39.498 ms| 2600:1f16:bb9:f90b:5f12:132a:4ab3:6493.51114 > 2607:f8b0:4009:806::200e.443 | snd_cwnd 10 ssthresh 2147483647 snd_wnd 66816 srtt 17001 rcv_wnd 56704 length 327
+1.76134s | 39.546 ms| 2600:1f16:bb9:f90b:5f12:132a:4ab3:6493.51114 > 2607:f8b0:4009:806::200e.443 | snd_cwnd 10 ssthresh 2147483647 snd_wnd 66816 srtt 17001 rcv_wnd 56704 length 251
+1.76138s | 39.579 ms| 2600:1f16:bb9:f90b:5f12:132a:4ab3:6493.51114 > 2607:f8b0:4009:806::200e.443 | snd_cwnd 10 ssthresh 2147483647 snd_wnd 66816 srtt 17001 rcv_wnd 56704 length 31
+1.76144s | 39.640 ms| 2600:1f16:bb9:f90b:5f12:132a:4ab3:6493.51114 > 2607:f8b0:4009:806::200e.443 | snd_cwnd 10 ssthresh 2147483647 snd_wnd 66816 srtt 17001 rc
 ```
 
 ## Motivation

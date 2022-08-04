@@ -141,7 +141,7 @@ struct Handler {
     port: Option<u16>,
     ip: Option<IpAddr>,
     start: Instant,
-    cache: std::collections::HashMap<(SocketAddr, SocketAddr), Instant>,
+    cache: std::collections::HashMap<(SocketAddr, SocketAddr), u64>,
     // TODO clean cached entries out automatically - it's possible to
     // tcp state events to observe connection has close or timeout
     // to clean up these entries
@@ -207,7 +207,8 @@ impl Handler {
             }
         }
 
-        let first_seen = self.cache.entry((source, dest)).or_insert(Instant::now());
+        let first_seen = self.cache.entry((source, dest)).or_insert(time);
+        let connection_duration = Duration::from_nanos(time - *first_seen);
 
         let debug_drift = false;
         if debug_drift {
@@ -239,10 +240,9 @@ impl Handler {
         }
 
         println!(
-        "k:{} {:.3}ms | {:.3} ms| {:?}.{} > {:?}.{} | snd_cwnd {} ssthresh {} snd_wnd {} srtt {:3} rcv_wnd {} length {}",
-        time, offset_time as f64 / 1e6 ,
-        // self.start.elapsed().as_secs_f64() * 1000.0,
-        first_seen.elapsed().as_secs_f64() * 1000.0,
+        "{:.5}s | {:.3} ms| {:?}.{} > {:?}.{} | snd_cwnd {} ssthresh {} snd_wnd {} srtt {:3} rcv_wnd {} length {}",
+        offset_time as f64 / 1e9 ,
+        connection_duration.as_secs_f64() * 1000.0,
         source_ip,
         sport,
         dest_ip,
