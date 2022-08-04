@@ -4,11 +4,11 @@
 use aya_bpf::{
     helpers::bpf_ktime_get_ns,
     macros::{map, tracepoint},
-    maps::{PerfEventArray, HashMap},
+    maps::{HashMap, PerfEventArray},
     programs::TracePointContext,
 };
 use aya_log_ebpf::info;
-use tcc_trace_common::{TcpProbe, TracePayload, STARTED_KTIME, PORT_FILTER};
+use tcc_trace_common::{TcpProbe, TracePayload, PORT_FILTER, STARTED_KTIME};
 
 #[map]
 static mut TCP_PROBES: PerfEventArray<TracePayload> = PerfEventArray::new(0);
@@ -49,7 +49,7 @@ unsafe fn try_tcc_trace(ctx: TracePointContext) -> Result<u64, i64> {
             time
         }
 
-        Some(started) => { *started }
+        Some(started) => *started,
     };
 
     let payload = TracePayload {

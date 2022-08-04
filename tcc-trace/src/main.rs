@@ -35,7 +35,9 @@ struct Opt {
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    start_server()?;
+    std::thread::spawn(|| {
+        start_tcpinfo_server();
+    });
 
     let Opt { port, ip, debug } = Opt::parse();
 
@@ -304,7 +306,7 @@ fn format_socket(sock: socket) -> Option<SocketAddr> {
     }
 }
 
-fn start_server() -> Result<(), anyhow::Error> {
+fn start_tcpinfo_server() -> Result<(), anyhow::Error> {
     use socket2::{Domain, Socket, Type};
     use std::io::{Read, Write};
     use std::net::{SocketAddr, TcpListener};
@@ -337,13 +339,15 @@ fn start_server() -> Result<(), anyhow::Error> {
          ( getsockopt( tcp_work_socket, SOL_TCP, TCP_INFO, (void *)&tcp_info, &tcp_info_length ) == 0 ) {
         */
 
+        let start = Instant::now();
+
         while match stream.read(&mut buf) {
             Ok(size) => {
                 if size == 0 {
                     false
                 } else {
                     println!("Got something {}", size);
-                    for i in 0..4000 {
+                    for i in 0..2000 {
                         // perhaps we can switch this out for the nix crate
                         let mut tcp_info_length = mem::size_of::<tcp_info>() as _;
                         let info = unsafe {
@@ -365,13 +369,21 @@ fn start_server() -> Result<(), anyhow::Error> {
 
                         let debug = format!("info {:?}", info);
 
-                        if i % 100 == 0 {
+                        if i % 1000 == 0 {
                             println!("{}", debug);
                         }
 
-                        stream.write(debug.as_bytes())?;
+                        let info = TcpinfoEvent {
+                            time: start.elapsed().as_secs_f64() * 1000.0,
+                            snd_cwnd: info.tcpi_snd_cwnd,
+                            snd_ssthresh: info.tcpi_snd_ssthresh,
+                            bytes_sent: info.tcpi_bytes_sent,
+                        };
+
+                        let json = serde_json::to_string(&info)?;
+                        stream.write(json.as_bytes())?;
                         stream.write(b"\n")?;
-                        for i in 0..5 {
+                        for i in 0..10 {
                             stream.write(blank.as_bytes())?;
                         }
                         stream.write(b"\n")?;
@@ -394,4 +406,15 @@ fn start_server() -> Result<(), anyhow::Error> {
     }
 
     Ok(())
+}
+
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
+/// streaming event to a client
+struct TcpinfoEvent {
+    time: f64,
+    snd_cwnd: u32,
+    snd_ssthresh: u32,
+    bytes_sent: u64,
 }
