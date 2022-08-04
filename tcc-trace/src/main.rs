@@ -320,6 +320,8 @@ fn start_server() -> Result<(), anyhow::Error> {
 
     let listener: TcpListener = socket.into();
 
+    let blank = " ".repeat(1024);
+
     while let Ok((mut stream, peer)) = listener.accept() {
         println!("{:?} {:?}", stream, peer);
         let mut buf = [0 as u8; 1024]; // using 50 byte buffer
@@ -341,28 +343,42 @@ fn start_server() -> Result<(), anyhow::Error> {
                     false
                 } else {
                     println!("Got something {}", size);
-                    // perhaps we can switch this out for the nix crate
-                    let mut tcp_info_length = mem::size_of::<tcp_info>() as _;
-                    let info = unsafe {
-                        let mut payload: MaybeUninit<tcp_info> = MaybeUninit::uninit();
-                        let ret = libc::getsockopt(
-                            fd,
-                            libc::SOL_TCP,
-                            libc::TCP_INFO,
-                            payload.as_mut_ptr().cast(),
-                            &mut tcp_info_length,
-                        );
+                    for i in 0..4000 {
+                        // perhaps we can switch this out for the nix crate
+                        let mut tcp_info_length = mem::size_of::<tcp_info>() as _;
+                        let info = unsafe {
+                            let mut payload: MaybeUninit<tcp_info> = MaybeUninit::uninit();
+                            let ret = libc::getsockopt(
+                                fd,
+                                libc::SOL_TCP,
+                                libc::TCP_INFO,
+                                payload.as_mut_ptr().cast(),
+                                &mut tcp_info_length,
+                            );
 
-                        if ret == -1 {
-                            return Err(std::io::Error::last_os_error().into());
+                            if ret == -1 {
+                                return Err(std::io::Error::last_os_error().into());
+                            }
+
+                            payload.assume_init()
+                        };
+
+                        let debug = format!("info {:?}", info);
+
+                        if i % 100 == 0 {
+                            println!("{}", debug);
                         }
 
-                        payload.assume_init()
-                    };
+                        stream.write(debug.as_bytes())?;
+                        stream.write(b"\n")?;
+                        for i in 0..5 {
+                            stream.write(blank.as_bytes())?;
+                        }
+                        stream.write(b"\n")?;
+                        stream.flush()?;
+                    }
+                    stream.shutdown(std::net::Shutdown::Both)?;
 
-                    println!("info {:?}", info);
-
-                    stream.write(&buf[0..size]).unwrap();
                     true
                 }
             }
