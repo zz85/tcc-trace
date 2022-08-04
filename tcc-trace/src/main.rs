@@ -1,7 +1,7 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{mpsc, Arc};
-use std::time::Instant;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use aya::maps::perf::AsyncPerfEventArray;
 use aya::programs::TracePoint;
@@ -142,6 +142,10 @@ struct Handler {
     ip: Option<IpAddr>,
     start: Instant,
     cache: std::collections::HashMap<(SocketAddr, SocketAddr), Instant>,
+    // TODO clean cached entries out automatically - it's possible to
+    // tcp state events to observe connection has close or timeout
+    // to clean up these entries
+    first_drift: Option<Duration>,
 }
 
 impl Handler {
@@ -151,6 +155,7 @@ impl Handler {
             port,
             start: Instant::now(),
             cache: Default::default(),
+            first_drift: Default::default(),
         }
     }
     fn process_event(&mut self, payload: TracePayload) {
@@ -203,6 +208,32 @@ impl Handler {
         }
 
         let first_seen = self.cache.entry((source, dest)).or_insert(Instant::now());
+
+        match self.first_drift {
+            Some(first_drift) => {
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos();
+                let current_drift = Duration::from_nanos(now as u64 - time);
+
+                let diff = if first_drift > current_drift {
+                    first_drift - current_drift
+                } else {
+                    current_drift - first_drift
+                };
+                println!("current drift {:?}", diff);
+            }
+            None => {
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos();
+                let drift = Duration::from_nanos(now as u64 - time);
+                println!("Drift {:?} {:?}", now, drift);
+                self.first_drift = Some(drift);
+            }
+        }
 
         println!(
         "{} {}\n{:.3} ms| {:?}.{} > {:?}.{} | snd_cwnd {} ssthresh {} snd_wnd {} srtt {:3} rcv_wnd {} length {}",
