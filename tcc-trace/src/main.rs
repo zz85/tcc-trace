@@ -15,7 +15,7 @@ use bytes::BytesMut;
 use clap::Parser;
 use log::info;
 use simplelog::{ColorChoice, ConfigBuilder, LevelFilter, TermLogger, TerminalMode};
-use tcc_trace_common::{socket, TcpProbe, TracePayload, AF_INET, AF_INET6, PORT_FILTER, tcp_info};
+use tcc_trace_common::{socket, tcp_info, TcpProbe, TracePayload, AF_INET, AF_INET6, PORT_FILTER};
 use tokio::{signal, task};
 
 /// Congestion Control tracer for TCP connections
@@ -322,47 +322,18 @@ fn start_server() -> Result<(), anyhow::Error> {
 
     while let Ok((mut stream, peer)) = listener.accept() {
         println!("{:?} {:?}", stream, peer);
-        let mut buf = [0 as u8; 50]; // using 50 byte buffer
+        let mut buf = [0 as u8; 1024]; // using 50 byte buffer
+        let fd = stream.as_raw_fd();
 
-        let local = stream.local_addr()?;
-        let fd =  stream.as_raw_fd();
-        println!("local {:?}", local);
-        println!("fd {:?}", fd);
+        /*
+        struct tcp_info tcpi;
+        socklen_t len = sizeof(struct tcp_info);
+        int rc = getsockopt(c->fd, IPPROTO_TCP, TCP_INFO,
+                        &tcpi, &len);
 
-        // &on as *const _ as _,
-        // mem::size_of_val(&on) as _
-
-        let mut info =  tcp_info::default();
-
-        let mut payload: MaybeUninit<tcp_info> = MaybeUninit::uninit();
-        let mut tcp_info_length = mem::size_of::<tcp_info>() as _;
-
-        println!("info {:?}", mem::size_of::<tcp_info>());
-
-        unsafe {
-            let ret = libc::getsockopt(fd, libc::SOL_TCP, libc::TCP_INFO,  &info as *const _  as *mut _, &mut tcp_info_length);
-            println!("res {}", ret);
-
-            if ret == -1 {
-                return Err(std::io::Error::last_os_error().into());
-            }
-        }
-
-        println!("info {:?}", info);
-        println!("payload {:?}", payload);
-
-    /*
-    struct tcp_info tcpi;
-    socklen_t len = sizeof(struct tcp_info);
-    int rc = getsockopt(c->fd, IPPROTO_TCP, TCP_INFO,
-                    &tcpi, &len);
-    
-        tcp_info_length = sizeof(tcp_info);
-     ( getsockopt( tcp_work_socket, SOL_TCP, TCP_INFO, (void *)&tcp_info, &tcp_info_length ) == 0 ) {
-    */
-        
-
-
+            tcp_info_length = sizeof(tcp_info);
+         ( getsockopt( tcp_work_socket, SOL_TCP, TCP_INFO, (void *)&tcp_info, &tcp_info_length ) == 0 ) {
+        */
 
         while match stream.read(&mut buf) {
             Ok(size) => {
@@ -370,6 +341,27 @@ fn start_server() -> Result<(), anyhow::Error> {
                     false
                 } else {
                     println!("Got something {}", size);
+                    // perhaps we can switch this out for the nix crate
+                    let mut tcp_info_length = mem::size_of::<tcp_info>() as _;
+                    let info = unsafe {
+                        let mut payload: MaybeUninit<tcp_info> = MaybeUninit::uninit();
+                        let ret = libc::getsockopt(
+                            fd,
+                            libc::SOL_TCP,
+                            libc::TCP_INFO,
+                            payload.as_mut_ptr().cast(),
+                            &mut tcp_info_length,
+                        );
+
+                        if ret == -1 {
+                            return Err(std::io::Error::last_os_error().into());
+                        }
+
+                        payload.assume_init()
+                    };
+
+                    println!("info {:?}", info);
+
                     stream.write(&buf[0..size]).unwrap();
                     true
                 }
