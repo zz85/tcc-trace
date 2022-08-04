@@ -1,4 +1,4 @@
-use std::mem;
+use std::mem::{self, MaybeUninit};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::os::unix::prelude::AsRawFd;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -333,12 +333,14 @@ fn start_server() -> Result<(), anyhow::Error> {
         // mem::size_of_val(&on) as _
 
         let mut info =  tcp_info::default();
-        let tcp_info_length = mem::size_of::<tcp_info>() as _;
+
+        let mut payload: MaybeUninit<tcp_info> = MaybeUninit::uninit();
+        let mut tcp_info_length = mem::size_of::<tcp_info>() as _;
 
         println!("info {:?}", mem::size_of::<tcp_info>());
 
         unsafe {
-            let ret = libc::getsockopt(fd, libc::SOL_TCP, libc::TCP_INFO, &info as *const _  as *mut _, tcp_info_length);
+            let ret = libc::getsockopt(fd, libc::SOL_TCP, libc::TCP_INFO,  &info as *const _  as *mut _, &mut tcp_info_length);
             println!("res {}", ret);
 
             if ret == -1 {
@@ -346,7 +348,8 @@ fn start_server() -> Result<(), anyhow::Error> {
             }
         }
 
-        println!("{:?}", info);
+        println!("info {:?}", info);
+        println!("payload {:?}", payload);
 
     /*
     struct tcp_info tcpi;
