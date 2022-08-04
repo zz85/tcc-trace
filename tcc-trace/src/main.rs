@@ -1,10 +1,12 @@
+use std::mem;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
+use std::os::unix::prelude::AsRawFd;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use aya::maps::HashMap;
 use aya::maps::perf::AsyncPerfEventArray;
+use aya::maps::HashMap;
 use aya::programs::TracePoint;
 use aya::util::online_cpus;
 use aya::{include_bytes_aligned, Bpf};
@@ -13,7 +15,7 @@ use bytes::BytesMut;
 use clap::Parser;
 use log::info;
 use simplelog::{ColorChoice, ConfigBuilder, LevelFilter, TermLogger, TerminalMode};
-use tcc_trace_common::{socket, TcpProbe, TracePayload, AF_INET, AF_INET6, PORT_FILTER};
+use tcc_trace_common::{socket, TcpProbe, TracePayload, AF_INET, AF_INET6, PORT_FILTER, tcp_info};
 use tokio::{signal, task};
 
 /// Congestion Control tracer for TCP connections
@@ -33,6 +35,8 @@ struct Opt {
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
+    start_server()?;
+
     let Opt { port, ip, debug } = Opt::parse();
 
     if let Some(ip) = ip {
@@ -298,4 +302,85 @@ fn format_socket(sock: socket) -> Option<SocketAddr> {
             _ => None,
         }
     }
+}
+
+fn start_server() -> Result<(), anyhow::Error> {
+    use socket2::{Domain, Socket, Type};
+    use std::io::{Read, Write};
+    use std::net::{SocketAddr, TcpListener};
+
+    // Create a TCP listener bound to two addresses.
+    let socket = Socket::new(Domain::IPV6, Type::STREAM, None)?;
+
+    socket.set_reuse_port(true)?;
+
+    let address: SocketAddr = "[::]:1234".parse().unwrap();
+    socket.bind(&address.into())?;
+    socket.listen(128)?;
+
+    let listener: TcpListener = socket.into();
+
+    while let Ok((mut stream, peer)) = listener.accept() {
+        println!("{:?} {:?}", stream, peer);
+        let mut buf = [0 as u8; 50]; // using 50 byte buffer
+
+        let local = stream.local_addr()?;
+        let fd =  stream.as_raw_fd();
+        println!("local {:?}", local);
+        println!("fd {:?}", fd);
+
+        // &on as *const _ as _,
+        // mem::size_of_val(&on) as _
+
+        let mut info =  tcp_info::default();
+        let tcp_info_length = mem::size_of::<tcp_info>() as _;
+
+        println!("info {:?}", mem::size_of::<tcp_info>());
+
+        unsafe {
+            let ret = libc::getsockopt(fd, libc::SOL_TCP, libc::TCP_INFO, &info as *const _  as *mut _, tcp_info_length);
+            println!("res {}", ret);
+
+            if ret == -1 {
+                return Err(std::io::Error::last_os_error().into());
+            }
+        }
+
+        println!("{:?}", info);
+
+    /*
+    struct tcp_info tcpi;
+    socklen_t len = sizeof(struct tcp_info);
+    int rc = getsockopt(c->fd, IPPROTO_TCP, TCP_INFO,
+                    &tcpi, &len);
+    
+        tcp_info_length = sizeof(tcp_info);
+     ( getsockopt( tcp_work_socket, SOL_TCP, TCP_INFO, (void *)&tcp_info, &tcp_info_length ) == 0 ) {
+    */
+        
+
+
+
+        while match stream.read(&mut buf) {
+            Ok(size) => {
+                if size == 0 {
+                    false
+                } else {
+                    println!("Got something {}", size);
+                    stream.write(&buf[0..size]).unwrap();
+                    true
+                }
+            }
+            Err(_) => {
+                println!(
+                    "An error occurred, terminating connection with {}",
+                    stream.peer_addr().unwrap()
+                );
+                stream.shutdown(std::net::Shutdown::Both).unwrap();
+                false
+            }
+        } {}
+    }
+
+    Ok(())
 }

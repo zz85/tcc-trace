@@ -45,14 +45,15 @@ also gave me some understanding how tracepoints work.
 - [x] Basic TCP Probing via Tracepoint
 - [x] Display cwnd, ssthresh, sttt, length
 - [x] Filtering based on IP or port number
+- [x] IP filtering in BPF
+- [x] Identify and run timer for individual connections
 
 ## TODOs
-- [ ] Test binaries on different hosts
+- [x] Test binaries on different hosts
 - [ ] Logging to trace file
 - [ ] Nicer colors, UI
-- [ ] Identify and run timer for individual connections
 - [ ] Trace other pieces of connection properties
-- [ ] In kernel filtering optimization
+- [ ] IP filtering in bpf optimization 
 
 ## Prerequisites
 
