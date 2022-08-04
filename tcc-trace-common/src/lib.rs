@@ -101,3 +101,4 @@ pub union socket {
 }
 
 pub const STARTED_KTIME: u8 = 0;
+pub const PORT_FILTER: u8 = 1;

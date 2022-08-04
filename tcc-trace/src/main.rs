@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use aya::maps::HashMap;
 use aya::maps::perf::AsyncPerfEventArray;
 use aya::programs::TracePoint;
 use aya::util::online_cpus;
@@ -12,7 +13,7 @@ use bytes::BytesMut;
 use clap::Parser;
 use log::info;
 use simplelog::{ColorChoice, ConfigBuilder, LevelFilter, TermLogger, TerminalMode};
-use tcc_trace_common::{socket, TcpProbe, TracePayload, AF_INET, AF_INET6};
+use tcc_trace_common::{socket, TcpProbe, TracePayload, AF_INET, AF_INET6, PORT_FILTER};
 use tokio::{signal, task};
 
 /// Congestion Control tracer for TCP connections
@@ -85,6 +86,11 @@ async fn main() -> Result<(), anyhow::Error> {
     let event_count = Arc::new(AtomicU64::new(0));
     let filtered_count = Arc::new(AtomicU64::new(0));
     let mut perf_array = AsyncPerfEventArray::try_from(bpf.map_mut("TCP_PROBES")?)?;
+    let mut tcc_settings = HashMap::try_from(bpf.map_mut("TCC_SETTINGS")?)?;
+
+    if let Some(port) = port {
+        tcc_settings.insert(PORT_FILTER, port as u64, 0)?;
+    }
 
     let (tx, rx) = mpsc::channel();
 
@@ -190,7 +196,7 @@ impl Handler {
         if let Some(port) = self.port {
             // if port is set, filter connections that doesn't match
             if sport != port && dport != port {
-                // filtered_count.fetch_add(1, Ordering::Relaxed);
+                println!("shouldn't happen!");
                 return;
             }
         }

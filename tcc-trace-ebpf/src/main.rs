@@ -8,7 +8,7 @@ use aya_bpf::{
     programs::TracePointContext,
 };
 use aya_log_ebpf::info;
-use tcc_trace_common::{TcpProbe, TracePayload, STARTED_KTIME};
+use tcc_trace_common::{TcpProbe, TracePayload, STARTED_KTIME, PORT_FILTER};
 
 #[map]
 static mut TCP_PROBES: PerfEventArray<TracePayload> = PerfEventArray::new(0);
@@ -29,10 +29,13 @@ unsafe fn try_tcc_trace(ctx: TracePointContext) -> Result<u64, i64> {
 
     let TcpProbe { sport, dport, .. } = probe;
 
-    let target_port = 443;
-    if sport == target_port || dport == target_port {
-        // As an optimization, filtering can be done in kernel space
-        // Currently, we'll make do with sending and filtering in user space
+    if let Some(target_port) = TCC_SETTINGS.get(&PORT_FILTER) {
+        let target_port = *target_port;
+        if sport as u64 != target_port && dport as u64 != target_port {
+            // As an optimization, filtering can be done in kernel space
+            // Currently, IP filtering still done in user space
+            return Ok(0);
+        }
     }
 
     // bpf_ktime_get_boot_ns() to include suspection time
