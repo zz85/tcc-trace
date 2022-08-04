@@ -99,3 +99,5 @@ pub union socket {
     pub v4: sockaddr,
     pub v6: sockaddr_in6,
 }
+
+pub const STARTED_KTIME: u8 = 0;

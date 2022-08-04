@@ -16,19 +16,22 @@ OPTIONS:
     -i, --ip <IP>        Filter by ip (shows all ips by default)
     -p, --port <PORT>    Filter by port number (display all ports by default)
 
-tcc-trace$ sudo target/release/tcc-trace --port 443
-BPF Tracepoint attached 1.6007ms
+tcc-trace$ sudo target/release/tcc-trace --port 22
+
+Filtering port: 22
+TCP Probe attached via BPF Tracepoint in 1.456ms
 Waiting for Ctrl-C...
-6302.613| 2600:1f16:bb9:f90b:5f12:132a:4ab3:6493.55788 > 2607:f8b0:4009:814::200e.443 | snd_nxt 3034180476 snd_una 3034179959 snd_cwnd 10 ssthresh 2147483647 snd_wnd 65535 srtt 17133 rcv_wnd 62592 sock_cookie 490 length 0
-6311.617| 2600:1f16:bb9:f90b:5f12:132a:4ab3:6493.55788 > 2607:f8b0:4009:814::200e.443 | snd_nxt 3034180476 snd_una 3034180476 snd_cwnd 10 ssthresh 2147483647 snd_wnd 66816 srtt 17116 rcv_wnd 62592 sock_cookie 490 length 2416
-6311.639| 2600:1f16:bb9:f90b:5f12:132a:4ab3:6493.55788 > 2607:f8b0:4009:814::200e.443 | snd_nxt 3034180476 snd_una 3034180476 snd_cwnd 10 ssthresh 2147483647 snd_wnd 66816 srtt 17116 rcv_wnd 60288 sock_cookie 490 length 2416
-6311.695| 2600:1f16:bb9:f90b:5f12:132a:4ab3:6493.55788 > 2607:f8b0:4009:814::200e.443 | snd_nxt 3034180476 snd_una 3034180476 snd_cwnd 10 ssthresh 2147483647 snd_wnd 66816 srtt 17116 rcv_wnd 57984 sock_cookie 490 length 1858
-6330.893| 2600:1f16:bb9:f90b:5f12:132a:4ab3:6493.55788 > 2607:f8b0:4009:814::200e.443 | snd_nxt 3034180744 snd_una 3034180476 snd_cwnd 10 ssthresh 2147483647 snd_wnd 66816 srtt 17116 rcv_wnd 56704 sock_cookie 490 length 648
-6331.401| 2600:1f16:bb9:f90b:5f12:132a:4ab3:6493.55788 > 2607:f8b0:4009:814::200e.443 | snd_nxt 3034180775 snd_una 3034180744 snd_cwnd 10 ssthresh 2147483647 snd_wnd 66816 srtt 17239 rcv_wnd 56704 sock_cookie 490 length 31
-6343.370| 2600:1f16:bb9:f90b:5f12:132a:4ab3:6493.55788 > 2607:f8b0:4009:814::200e.443 | snd_nxt 3034180775 snd_una 3034180744 snd_cwnd 10 ssthresh 2147483647 snd_wnd 66816 srtt 17239 rcv_wnd 56704 sock_cookie 490 length 327
-6343.391| 2600:1f16:bb9:f90b:5f12:132a:4ab3:6493.55788 > 2607:f8b0:4009:814::200e.443 | snd_nxt 3034180775 snd_una 3034180744 snd_cwnd 10 ssthresh 2147483647 snd_wnd 66816 srtt 17239 rcv_wnd 56704 sock_cookie 490 length 251
-6343.455| 2600:1f16:bb9:f90b:5f12:132a:4ab3:6493.55788 > 2607:f8b0:4009:814::200e.443 | snd_nxt 3034180775 snd_una 3034180744 snd_cwnd 10 ssthresh 2147483647 snd_wnd 66816 srtt 17239 rcv_wnd 56704 sock_cookie 490 length 31
-6343.482| 2600:1f16:bb9:f90b:5f12:132a:4ab3:6493.55788 > 2607:f8b0:4009:814::200e.443 | snd_nxt 3034180775 snd_una 3034180744 snd_cwnd 10 ssthresh 2147483647 snd_wnd 66816 srtt 17239 rcv_wnd 56704 sock_cookie 490 length 39
+k:22329653706207571 21.992ms | 0.002 ms| 172.31.46.125.22 > 52.95.4.0.29736 | snd_cwnd 10 ssthresh 46 snd_wnd 261632 srtt 77035 rcv_wnd 56576 length 0
+k:22329653729933673 45.719ms | 0.001 ms| 172.31.46.125.22 > 52.95.4.0.9249 | snd_cwnd 10 ssthresh 24 snd_wnd 131072 srtt 72946 rcv_wnd 93952 length 0
+k:22329653735191663 50.977ms | 5.237 ms| 172.31.46.125.22 > 52.95.4.0.9249 | snd_cwnd 11 ssthresh 24 snd_wnd 131072 srtt 72867 rcv_wnd 93952 length 0
+k:22329653735996878 51.782ms | 29.746 ms| 172.31.46.125.22 > 52.95.4.0.29736 | snd_cwnd 11 ssthresh 46 snd_wnd 261632 srtt 76853 rcv_wnd 56576 length 0
+k:22329653742158975 57.944ms | 35.912 ms| 172.31.46.125.22 > 52.95.4.0.29736 | snd_cwnd 12 ssthresh 46 snd_wnd 261632 srtt 77035 rcv_wnd 56576 length 0
+k:22329653747879769 63.665ms | 17.925 ms| 172.31.46.125.22 > 52.95.4.0.9249 | snd_cwnd 12 ssthresh 24 snd_wnd 131072 srtt 72908 rcv_wnd 93952 length 0
+k:22329653754174690 69.960ms | 47.925 ms| 172.31.46.125.22 > 52.95.4.0.29736 | snd_cwnd 13 ssthresh 46 snd_wnd 261632 srtt 77432 rcv_wnd 56576 length 0
+k:22329653757416239 73.201ms | 27.458 ms| 172.31.46.125.22 > 52.95.4.0.9249 | snd_cwnd 13 ssthresh 24 snd_wnd 131072 srtt 72714 rcv_wnd 93952 length 0
+k:22329653760128801 75.914ms | 30.170 ms| 172.31.46.125.22 > 52.95.4.0.9249 | snd_cwnd 14 ssthresh 24 snd_wnd 131072 srtt 72765 rcv_wnd 93952 length 0
+k:22329653760940866 76.726ms | 54.689 ms| 172.31.46.125.22 > 52.95.4.0.29736 | snd_cwnd 14 ssthresh 46 snd_wnd 261632 srtt 77465 rcv_wnd 56576 length 0
+k:22329653766101023 81.886ms | 59.883 ms| 172.31.46.125.22 > 52.95.4.0.29736 | snd_cwnd 15 ssthresh 46 snd_wnd 261632 srtt 77368 rcv_wnd 56576 length 0
 ```
 
 ## Motivation

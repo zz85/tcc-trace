@@ -209,35 +209,38 @@ impl Handler {
 
         let first_seen = self.cache.entry((source, dest)).or_insert(Instant::now());
 
-        match self.first_drift {
-            Some(first_drift) => {
-                let now = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_nanos();
-                let current_drift = Duration::from_nanos(now as u64 - time);
+        let debug_drift = false;
+        if debug_drift {
+            // estimate drift from kernel -> userspace
+            match self.first_drift {
+                Some(first_drift) => {
+                    let now = SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap()
+                        .as_nanos();
+                    let current_drift = Duration::from_nanos(now as u64 - time);
 
-                let diff = if first_drift > current_drift {
-                    first_drift - current_drift
-                } else {
-                    current_drift - first_drift
-                };
-                println!("current drift {:?}", diff);
-            }
-            None => {
-                let now = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_nanos();
-                let drift = Duration::from_nanos(now as u64 - time);
-                println!("Drift {:?} {:?}", now, drift);
-                self.first_drift = Some(drift);
+                    let diff = if first_drift > current_drift {
+                        first_drift - current_drift
+                    } else {
+                        current_drift - first_drift
+                    };
+                    print!("drift:{:?} | ", diff);
+                }
+                None => {
+                    let now = SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap()
+                        .as_nanos();
+                    let drift = Duration::from_nanos(now as u64 - time);
+                    self.first_drift = Some(drift);
+                }
             }
         }
 
         println!(
-        "{} {}\n{:.3} ms| {:?}.{} > {:?}.{} | snd_cwnd {} ssthresh {} snd_wnd {} srtt {:3} rcv_wnd {} length {}",
-        time, offset_time,
+        "k:{} {:.3}ms | {:.3} ms| {:?}.{} > {:?}.{} | snd_cwnd {} ssthresh {} snd_wnd {} srtt {:3} rcv_wnd {} length {}",
+        time, offset_time as f64 / 1e6 ,
         // self.start.elapsed().as_secs_f64() * 1000.0,
         first_seen.elapsed().as_secs_f64() * 1000.0,
         source_ip,

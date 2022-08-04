@@ -4,14 +4,17 @@
 use aya_bpf::{
     helpers::bpf_ktime_get_ns,
     macros::{map, tracepoint},
-    maps::PerfEventArray,
+    maps::{PerfEventArray, HashMap},
     programs::TracePointContext,
 };
 use aya_log_ebpf::info;
-use tcc_trace_common::{TcpProbe, TracePayload};
+use tcc_trace_common::{TcpProbe, TracePayload, STARTED_KTIME};
 
 #[map]
 static mut TCP_PROBES: PerfEventArray<TracePayload> = PerfEventArray::new(0);
+
+#[map]
+static mut TCC_SETTINGS: HashMap<u8, u64> = HashMap::with_max_entries(1024, 0);
 
 #[tracepoint(name = "tcc_trace")]
 pub fn tcc_trace(ctx: TracePointContext) -> u64 {
@@ -37,9 +40,18 @@ unsafe fn try_tcc_trace(ctx: TracePointContext) -> Result<u64, i64> {
     // https://www.spinics.net/lists/netdev/msg645539.html
     let time = bpf_ktime_get_ns();
 
+    let started = match TCC_SETTINGS.get(&STARTED_KTIME) {
+        None => {
+            TCC_SETTINGS.insert(&STARTED_KTIME, &time, 0)?;
+            time
+        }
+
+        Some(started) => { *started }
+    };
+
     let payload = TracePayload {
         time,
-        offset_time: 0,
+        offset_time: time - started,
         probe,
     };
 
