@@ -4,13 +4,13 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
-    /*
+    return;
     // ls -l /usr/src/linux-headers-$(uname -r)
     // Tell cargo to look for shared libraries in the specified directory
     println!("cargo:rustc-link-search=/usr/src/linux-headers-5.4.0-1058-aws");
 
     // Tell cargo to invalidate the built crate whenever the wrapper changes
-    println!("cargo:rerun-if-changed=wrapper.h");
+    // println!("cargo:rerun-if-changed=wrapper.h");
 
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
@@ -21,6 +21,10 @@ fn main() {
         .header("wrapper.h")
         .allowlist_type("ethhdr")
         .allowlist_type("iphdr")
+        .allowlist_type("sk_buff")
+        .allowlist_type("udphdr")
+        .allowlist_type("tcphdr")
+        .allowlist_type("__sk_buff")
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
@@ -34,5 +38,4 @@ fn main() {
     bindings
         .write_to_file(out_path.join("bindings.rs"))
         .expect("Couldn't write bindings!");
-    */
 }

@@ -208,3 +208,26 @@ pub struct iphdr {
     pub saddr: __be32,
     pub daddr: __be32,
 }
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct udphdr {
+    pub source: __be16,
+    pub dest: __be16,
+    pub len: __be16,
+    pub check: __sum16,
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct tcphdr {
+    pub source: __be16,
+    pub dest: __be16,
+    pub seq: __be32,
+    pub ack_seq: __be32,
+    pub _bitfield_align_1: [u8; 0],
+    pub _bitfield_1: [u8; 2usize],
+    pub window: __be16,
+    pub check: __sum16,
+    pub urg_ptr: __be16,
+}

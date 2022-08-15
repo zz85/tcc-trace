@@ -7,7 +7,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use aya::maps::perf::AsyncPerfEventArray;
 use aya::maps::HashMap;
-use aya::programs::TracePoint;
+use aya::programs::{tc, SchedClassifier, TcAttachType, TracePoint};
 use aya::util::online_cpus;
 use aya::{include_bytes_aligned, Bpf};
 use aya_log::BpfLogger;
@@ -35,9 +35,9 @@ struct Opt {
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    std::thread::spawn(|| {
-        start_tcpinfo_server();
-    });
+    // std::thread::spawn(|| {
+    //     start_tcpinfo_server();
+    // });
 
     let Opt { port, ip, debug } = Opt::parse();
 
@@ -80,13 +80,20 @@ async fn main() -> Result<(), anyhow::Error> {
     BpfLogger::init(&mut bpf)?;
 
     let start = Instant::now();
-    let program: &mut TracePoint = bpf.program_mut("tcc_trace").unwrap().try_into()?;
-    program.load()?;
-    program.attach("tcp", "tcp_probe")?;
-    println!(
-        "TCP Probe attached via BPF Tracepoint in {:.3}ms",
-        start.elapsed().as_secs_f64() * 1000.0
-    );
+    // let program: &mut TracePoint = bpf.program_mut("tcc_trace").unwrap().try_into()?;
+    // program.load()?;
+    // program.attach("tcp", "tcp_probe")?;
+    // println!(
+    //     "TCP Probe attached via BPF Tracepoint in {:.3}ms",
+    //     start.elapsed().as_secs_f64() * 1000.0
+    // );
+
+    let tcprog: &mut SchedClassifier = bpf.program_mut("tc_cls_ingress").unwrap().try_into()?;
+    tcprog.load()?;
+
+    let ifname = "lo";
+    let _ = tc::qdisc_add_clsact(ifname);
+    tcprog.attach(ifname, TcAttachType::Ingress, 0)?;
 
     let mut handler = Handler::new(ip, port);
     let event_count = Arc::new(AtomicU64::new(0));
@@ -251,8 +258,10 @@ impl Handler {
             }
         }
 
+        let bytes_in_flight = snd_nxt - snd_una;
+
         println!(
-        "{:.5}s | {:.3} ms| {:?}.{} > {:?}.{} | snd_cwnd {} ssthresh {} snd_wnd {} srtt {:3} rcv_wnd {} length {}",
+        "{:.5}s | {:.3} ms| {:?}.{} > {:?}.{} | snd_cwnd {} ssthresh {} snd_wnd {} srtt {:3} rcv_wnd {} length {} bytes in flight {}",
         offset_time as f64 / 1e9 ,
         connection_duration.as_secs_f64() * 1000.0,
         source_ip,
@@ -263,6 +272,7 @@ impl Handler {
         ssthresh,
         snd_wnd, srtt, rcv_wnd,
         data_len,
+        bytes_in_flight,
     );
 
         let info = TcpinfoEvent {
