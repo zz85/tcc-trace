@@ -265,6 +265,16 @@ impl Handler {
         data_len,
     );
 
+        let info = TcpinfoEvent {
+            time: offset_time as f64 / 1e9,
+            snd_cwnd: snd_cwnd,
+            snd_ssthresh: ssthresh,
+            bytes_sent: data_len.into(),
+        };
+
+        let json = serde_json::to_string(&info).unwrap();
+        println!("{}", json);
+
         // snd_nxt {} snd_una {}  sock_cookie {}
         // snd_nxt,
         // snd_una,
@@ -309,7 +319,7 @@ fn format_socket(sock: socket) -> Option<SocketAddr> {
 fn start_tcpinfo_server() -> Result<(), anyhow::Error> {
     use socket2::{Domain, Socket, Type};
     use std::io::{Read, Write};
-    use std::net::{SocketAddr, TcpListener};
+    use std::net::TcpListener;
 
     // Create a TCP listener bound to two addresses.
     let socket = Socket::new(Domain::IPV6, Type::STREAM, None)?;

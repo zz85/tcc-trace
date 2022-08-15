@@ -178,3 +178,33 @@ pub struct tcp_info {
 
     pub tcpi_snd_wnd: u32, //;	     /* peer's advertised receive window after scaling (bytes) */
 }
+
+pub type __u8 = u8;
+pub type __u16 = u16;
+pub type __u32 = u32;
+pub type __be16 = __u16;
+pub type __be32 = __u32;
+pub type __sum16 = __u16;
+#[repr(C, packed)]
+#[derive(Debug, Copy, Clone)]
+pub struct ethhdr {
+    pub h_dest: [u8; 6usize],
+    pub h_source: [u8; 6usize],
+    pub h_proto: __be16,
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct iphdr {
+    pub _bitfield_align_1: [u8; 0],
+    pub _bitfield_1: [u8; 1usize],
+    pub tos: __u8,
+    pub tot_len: __be16,
+    pub id: __be16,
+    pub frag_off: __be16,
+    pub ttl: __u8,
+    pub protocol: __u8,
+    pub check: __sum16,
+    pub saddr: __be32,
+    pub daddr: __be32,
+}
