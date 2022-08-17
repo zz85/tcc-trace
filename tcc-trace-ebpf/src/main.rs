@@ -77,24 +77,30 @@ fn try_tc_cls_ingress(ctx: SkBuffContext) -> Result<(), i64> {
         return Err(-1);
     }
 
+    let map_from = 12345;
+    let map_to = 1234u16;
+
     let UDP_SRC_PORT = ETH_HDR_LEN + IP_HDR_LEN + offset_of!(udphdr, source);
-    let source_port = u16::from_be(ctx.load(UDP_SRC_PORT)?);
-
-    if 0 == source_port {
-        info!(&ctx, "testing source port {}", source_port);
-    }
-
     let UDP_DEST_PORT = ETH_HDR_LEN + IP_HDR_LEN + offset_of!(udphdr, dest);
 
+    let src_port = u16::from_be(ctx.load(UDP_SRC_PORT)?);
     let dest_port = u16::from_be(ctx.load(UDP_DEST_PORT)?);
-    info!(&ctx, "testing dest port {}", dest_port);
 
-    if dest_port == 12345 {
-        let changed = u16::to_be_bytes(12346);
+    info!(&ctx, "current: source -> dest {} {}", src_port, dest_port);
+
+    if dest_port == map_from {
+        // when matches map from
+        let changed = map_to.to_be_bytes();
         ctx.store(UDP_DEST_PORT, &changed, 0)?;
         // ctx.l4_csum_replace(UDP_DEST_PORT, source_port as u64, changed as u64, 0);
-        info!(&ctx, "port changed...");
+        info!(&ctx, "modified: source -> dest {} {}", src_port, map_to);
         return Err(1);
+    }
+
+    if src_port == map_to {
+        let changed = map_from.to_be_bytes();
+        ctx.store(UDP_SRC_PORT, &changed, 0)?;
+        info!(&ctx, "modified: source -> dest {} {}", map_from, dest_port);
     }
 
     // info!(&ctx, "accepted packet");
