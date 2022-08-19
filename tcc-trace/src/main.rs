@@ -15,7 +15,9 @@ use bytes::BytesMut;
 use clap::Parser;
 use log::info;
 use simplelog::{ColorChoice, ConfigBuilder, LevelFilter, TermLogger, TerminalMode};
-use tcc_trace_common::{socket, tcp_info, TcpProbe, TracePayload, AF_INET, AF_INET6, PORT_FILTER};
+use tcc_trace_common::{
+    socket, tcp_info, TcpProbe, TracePayload, AF_INET, AF_INET6, PORT_FILTER, PORT_MAP_TO,
+};
 use tokio::{signal, task};
 
 /// Congestion Control tracer for TCP connections
@@ -31,6 +33,10 @@ struct Opt {
 
     #[clap(short, long, value_parser)]
     debug: bool,
+
+    #[clap(short, long, value_parser)]
+    /// Port mapped to
+    map_to: Option<u16>,
 }
 
 #[tokio::main]
@@ -39,7 +45,12 @@ async fn main() -> Result<(), anyhow::Error> {
     //     start_tcpinfo_server();
     // });
 
-    let Opt { port, ip, debug } = Opt::parse();
+    let Opt {
+        port,
+        ip,
+        debug,
+        map_to,
+    } = Opt::parse();
 
     if let Some(ip) = ip {
         println!("Filtering IP: {:?}", ip);
@@ -94,15 +105,29 @@ async fn main() -> Result<(), anyhow::Error> {
     let ifname = "lo";
     let _ = tc::qdisc_add_clsact(ifname);
     tcprog.attach(ifname, TcAttachType::Ingress, 0)?;
+    tcprog.attach(ifname, TcAttachType::Egress, 0)?;
 
     let mut handler = Handler::new(ip, port);
     let event_count = Arc::new(AtomicU64::new(0));
     let filtered_count = Arc::new(AtomicU64::new(0));
     let mut perf_array = AsyncPerfEventArray::try_from(bpf.map_mut("TCP_PROBES")?)?;
     let mut tcc_settings = HashMap::try_from(bpf.map_mut("TCC_SETTINGS")?)?;
+    let mut matchlist_v4 = HashMap::try_from(bpf.map_mut("MATCHLIST_V4")?)?;
+
+    if let Some(ip) = ip {
+        if let IpAddr::V4(ip4) = ip {
+            let ip4: u32 = ip4.into();
+
+            matchlist_v4.insert(ip4, 1u8, 0)?;
+        }
+    }
 
     if let Some(port) = port {
         tcc_settings.insert(PORT_FILTER, port as u64, 0)?;
+    }
+
+    if let Some(map_to) = map_to {
+        tcc_settings.insert(PORT_MAP_TO, map_to as u64, 0)?;
     }
 
     let (tx, rx) = mpsc::channel();

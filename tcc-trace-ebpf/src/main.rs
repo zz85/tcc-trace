@@ -16,7 +16,8 @@ use aya_bpf::{
 use aya_log_ebpf::{error, info};
 use memoffset::offset_of;
 use tcc_trace_common::{
-    TcpProbe, TracePayload, __sk_buff, ethhdr, iphdr, udphdr, PORT_FILTER, STARTED_KTIME,
+    TcpProbe, TracePayload, __sk_buff, ethhdr, iphdr, udphdr, PORT_FILTER, PORT_MAP_TO,
+    STARTED_KTIME,
 };
 
 #[map]
@@ -33,7 +34,8 @@ const IPPROTO_TCP: u8 = 6;
 const IPPROTO_UDP: u8 = 17;
 
 #[map]
-static mut BLOCKLIST_V4_INGRESS: HashMap<u32, u8> = HashMap::with_max_entries(1024, 0);
+static mut MATCHLIST_V4: HashMap<u32, u8> = HashMap::with_max_entries(1024, 0);
+// TODO, use LSM instead
 
 #[classifier(name = "tc_cls_ingress")]
 pub fn tc_cls_ingress(ctx: SkBuffContext) -> i32 {
@@ -62,23 +64,43 @@ fn try_tc_cls_ingress(mut ctx: SkBuffContext) -> Result<(), i64> {
         return Ok(());
     }
 
+    // process only UDP or TCP and IPv4 only right now
+
     if ip_proto != IPPROTO_UDP {
         return Ok(());
     }
 
-    let buff = unsafe { core::mem::transmute::<_, &mut __sk_buff>(ctx.as_ptr()) };
+    // let buff = unsafe { core::mem::transmute::<_, &mut __sk_buff>(ctx.as_ptr()) };
     // in my testing only works up to napi_id field
-    info!(&ctx, "len transmute {}", buff.napi_id);
+
+    let protocol: u8 = ctx.load(ETH_HDR_LEN + offset_of!(iphdr, protocol))?;
 
     let saddr = u32::from_be(ctx.load(ETH_HDR_LEN + offset_of!(iphdr, saddr))?);
+    let daddr = u32::from_be(ctx.load(ETH_HDR_LEN + offset_of!(iphdr, daddr))?);
 
-    if unsafe { BLOCKLIST_V4_INGRESS.get(&saddr) }.is_some() {
-        error!(&ctx, "blocked packet");
-        return Err(-1);
+    info!(&ctx, "protocol {}", protocol);
+
+    let match_saddr = unsafe { MATCHLIST_V4.get(&saddr) };
+    let match_addr = unsafe { MATCHLIST_V4.get(&daddr) };
+
+    if match_saddr.or(match_addr).is_none() {
+        error!(&ctx, "nothing to do");
+
+        return Ok(());
+        // return Err(-1);
     }
 
-    let map_from = 12345;
-    let map_to = 1234u16;
+    info!(&ctx, "matched ip!");
+
+    let map_from = unsafe { TCC_SETTINGS.get(&PORT_FILTER) }
+        .map(|v| *v)
+        .unwrap_or_default() as u16;
+    let map_to = unsafe { TCC_SETTINGS.get(&PORT_MAP_TO) }
+        .map(|v| *v)
+        .unwrap_or_default() as u16;
+
+    // let map_from = 12345;
+    // let map_to = 1234u16;
 
     let UDP_SRC_PORT = ETH_HDR_LEN + IP_HDR_LEN + offset_of!(udphdr, source);
     let UDP_DEST_PORT = ETH_HDR_LEN + IP_HDR_LEN + offset_of!(udphdr, dest);

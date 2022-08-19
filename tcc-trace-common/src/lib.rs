@@ -103,6 +103,8 @@ pub union socket {
 pub const STARTED_KTIME: u8 = 0;
 pub const PORT_FILTER: u8 = 1;
 
+pub const PORT_MAP_TO: u8 = 10;
+
 #[repr(C)]
 #[derive(Copy, Clone, Default, Debug)]
 pub struct tcp_info {
