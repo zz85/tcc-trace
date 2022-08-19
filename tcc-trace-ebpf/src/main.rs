@@ -55,7 +55,7 @@ pub fn tc_cls_ingress(ctx: SkBuffContext) -> i32 {
     }
 }
 
-fn try_tc_cls_ingress(ctx: SkBuffContext) -> Result<(), i64> {
+fn try_tc_cls_ingress(mut ctx: SkBuffContext) -> Result<(), i64> {
     let eth_proto = u16::from_be(ctx.load(offset_of!(ethhdr, h_proto))?);
     let ip_proto = ctx.load::<u8>(ETH_HDR_LEN + offset_of!(iphdr, protocol))?;
     if !(eth_proto == ETH_P_IP && (ip_proto == IPPROTO_TCP || ip_proto == IPPROTO_UDP)) {

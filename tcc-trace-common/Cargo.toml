@@ -9,7 +9,7 @@ user = [ "aya" ]
 
 [dependencies]
 #aya = { version = ">=0.11", optional=true }
-aya = { version = ">=0.11", optional=true,  git = "https://github.com/zz85/aya", branch = "skbuff_load" }
+aya = { version = ">=0.11", optional=true,  git = "https://github.com/aya-rs/aya" }
 
 [lib]
 path = "src/lib.rs"
