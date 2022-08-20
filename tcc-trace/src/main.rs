@@ -16,7 +16,8 @@ use clap::Parser;
 use log::info;
 use simplelog::{ColorChoice, ConfigBuilder, LevelFilter, TermLogger, TerminalMode};
 use tcc_trace_common::{
-    socket, tcp_info, TcpProbe, TracePayload, AF_INET, AF_INET6, PORT_FILTER, PORT_MAP_TO,
+    socket, tcp_info, TcpProbe, TracePayload, AF_INET, AF_INET6, PORT_FILTER, PORT_MAP_FROM,
+    PORT_MAP_TO,
 };
 use tokio::{signal, task};
 
@@ -34,23 +35,39 @@ struct Opt {
     #[clap(short, long, value_parser)]
     debug: bool,
 
-    #[clap(short, long, value_parser)]
+    /// Port mapped from
+    #[clap(short = 'f', long, value_parser)]
+    map_from: Option<u16>,
+
     /// Port mapped to
+    #[clap(short = 't', long, value_parser)]
     map_to: Option<u16>,
+
+    /// TCP Probe HTTP Server
+    #[clap(short, long, value_parser)]
+    http_server: bool,
+
+    #[clap(long, value_parser)]
+    if_name: Option<String>,
 }
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    // std::thread::spawn(|| {
-    //     start_tcpinfo_server();
-    // });
-
     let Opt {
         port,
         ip,
         debug,
+        map_from,
         map_to,
+        http_server,
+        if_name,
     } = Opt::parse();
+
+    if http_server {
+        std::thread::spawn(|| {
+            start_tcpinfo_server();
+        });
+    }
 
     if let Some(ip) = ip {
         println!("Filtering IP: {:?}", ip);
@@ -63,6 +80,8 @@ async fn main() -> Result<(), anyhow::Error> {
     if (None, None) == (port, ip) {
         println!("No filters...");
     }
+
+    println!("Map from to Map to {:?} -> {:?}", map_from, map_to);
 
     if debug {
         TermLogger::init(
@@ -91,21 +110,24 @@ async fn main() -> Result<(), anyhow::Error> {
     BpfLogger::init(&mut bpf)?;
 
     let start = Instant::now();
-    // let program: &mut TracePoint = bpf.program_mut("tcc_trace").unwrap().try_into()?;
-    // program.load()?;
-    // program.attach("tcp", "tcp_probe")?;
-    // println!(
-    //     "TCP Probe attached via BPF Tracepoint in {:.3}ms",
-    //     start.elapsed().as_secs_f64() * 1000.0
-    // );
+    let program: &mut TracePoint = bpf.program_mut("tcc_trace").unwrap().try_into()?;
+    program.load()?;
+    program.attach("tcp", "tcp_probe")?;
+    println!(
+        "TCP Probe attached via BPF Tracepoint in {:.3}ms",
+        start.elapsed().as_secs_f64() * 1000.0
+    );
 
     let tcprog: &mut SchedClassifier = bpf.program_mut("tc_cls_ingress").unwrap().try_into()?;
     tcprog.load()?;
 
-    let ifname = "lo";
-    let _ = tc::qdisc_add_clsact(ifname);
-    tcprog.attach(ifname, TcAttachType::Ingress, 0)?;
-    tcprog.attach(ifname, TcAttachType::Egress, 0)?;
+    let ifname = match if_name {
+        Some(name) => name,
+        None => "lo".to_string(),
+    };
+    let _ = tc::qdisc_add_clsact(&ifname);
+    tcprog.attach(&ifname, TcAttachType::Ingress, 0)?;
+    tcprog.attach(&ifname, TcAttachType::Egress, 0)?;
 
     let mut handler = Handler::new(ip, port);
     let event_count = Arc::new(AtomicU64::new(0));
@@ -124,6 +146,10 @@ async fn main() -> Result<(), anyhow::Error> {
 
     if let Some(port) = port {
         tcc_settings.insert(PORT_FILTER, port as u64, 0)?;
+    }
+
+    if let Some(map_from) = map_from {
+        tcc_settings.insert(PORT_MAP_FROM, map_from as u64, 0)?;
     }
 
     if let Some(map_to) = map_to {
@@ -361,7 +387,7 @@ fn start_tcpinfo_server() -> Result<(), anyhow::Error> {
 
     socket.set_reuse_port(true)?;
 
-    let address: SocketAddr = "[::]:1234".parse().unwrap();
+    let address: SocketAddr = "[::]:12345".parse().unwrap();
     socket.bind(&address.into())?;
     socket.listen(128)?;
 

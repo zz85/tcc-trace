@@ -16,8 +16,8 @@ use aya_bpf::{
 use aya_log_ebpf::{error, info};
 use memoffset::offset_of;
 use tcc_trace_common::{
-    TcpProbe, TracePayload, __sk_buff, ethhdr, iphdr, udphdr, PORT_FILTER, PORT_MAP_TO,
-    STARTED_KTIME,
+    TcpProbe, TracePayload, __sk_buff, ethhdr, iphdr, udphdr, PORT_FILTER, PORT_MAP_FROM,
+    PORT_MAP_TO, STARTED_KTIME,
 };
 
 #[map]
@@ -66,49 +66,46 @@ fn try_tc_cls_ingress(mut ctx: SkBuffContext) -> Result<(), i64> {
 
     // process only UDP or TCP and IPv4 only right now
 
-    if ip_proto != IPPROTO_UDP {
-        return Ok(());
-    }
-
     // let buff = unsafe { core::mem::transmute::<_, &mut __sk_buff>(ctx.as_ptr()) };
     // in my testing only works up to napi_id field
 
-    let protocol: u8 = ctx.load(ETH_HDR_LEN + offset_of!(iphdr, protocol))?;
-
     let saddr = u32::from_be(ctx.load(ETH_HDR_LEN + offset_of!(iphdr, saddr))?);
     let daddr = u32::from_be(ctx.load(ETH_HDR_LEN + offset_of!(iphdr, daddr))?);
-
-    info!(&ctx, "protocol {}", protocol);
 
     let match_saddr = unsafe { MATCHLIST_V4.get(&saddr) };
     let match_addr = unsafe { MATCHLIST_V4.get(&daddr) };
 
     if match_saddr.or(match_addr).is_none() {
-        error!(&ctx, "nothing to do");
+        // error!(&ctx, "nothing to do");
 
         return Ok(());
         // return Err(-1);
     }
 
-    info!(&ctx, "matched ip!");
-
-    let map_from = unsafe { TCC_SETTINGS.get(&PORT_FILTER) }
+    let map_from = unsafe { TCC_SETTINGS.get(&PORT_MAP_FROM) }
         .map(|v| *v)
         .unwrap_or_default() as u16;
     let map_to = unsafe { TCC_SETTINGS.get(&PORT_MAP_TO) }
         .map(|v| *v)
         .unwrap_or_default() as u16;
 
+    // info!(&ctx, "matched ip! from {} to {}", map_from, map_to);
+
     // let map_from = 12345;
     // let map_to = 1234u16;
 
+    // UDP
     let UDP_SRC_PORT = ETH_HDR_LEN + IP_HDR_LEN + offset_of!(udphdr, source);
     let UDP_DEST_PORT = ETH_HDR_LEN + IP_HDR_LEN + offset_of!(udphdr, dest);
+
+    // TCP (Same with UDP offsets)
+    // let TCP_SRC_PORT = ETH_HDR_LEN + IP_HDR_LEN + offset_of!(tcphdr, source);
+    // let TCP_DEST_PORT = ETH_HDR_LEN + IP_HDR_LEN + offset_of!(tcphdr, source);
 
     let src_port = u16::from_be(ctx.load(UDP_SRC_PORT)?);
     let dest_port = u16::from_be(ctx.load(UDP_DEST_PORT)?);
 
-    info!(&ctx, "current: source -> dest {} {}", src_port, dest_port);
+    // info!(&ctx, "current: source -> dest {} {}", src_port, dest_port);
 
     if dest_port == map_from {
         // when matches map from
@@ -123,6 +120,7 @@ fn try_tc_cls_ingress(mut ctx: SkBuffContext) -> Result<(), i64> {
         let changed = map_from.to_be_bytes();
         ctx.store(UDP_SRC_PORT, &changed, 0)?;
         info!(&ctx, "modified: source -> dest {} {}", map_from, dest_port);
+        return Err(1);
     }
 
     // info!(&ctx, "accepted packet");
@@ -145,13 +143,13 @@ unsafe fn try_tcc_trace(ctx: TracePointContext) -> Result<u64, i64> {
     if let Some(target_port) = TCC_SETTINGS.get(&PORT_FILTER) {
         let target_port = *target_port;
         if sport as u64 != target_port && dport as u64 != target_port {
-            // As an optimization, filtering can be done in kernel space
-            // Currently, IP filtering still done in user space
+            // Early return if port doesn't match
+            // This is an optimization since filtering can be done in kernel space
             return Ok(0);
         }
     }
 
-    // bpf_ktime_get_boot_ns() to include suspection time
+    // bpf_ktime_get_boot_ns() to include suspension time
     // would be useful on mobile devices, see
     // https://www.spinics.net/lists/netdev/msg645539.html
     let time = bpf_ktime_get_ns();
