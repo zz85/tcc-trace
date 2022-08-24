@@ -65,7 +65,10 @@ async fn main() -> Result<(), anyhow::Error> {
 
     if http_server {
         std::thread::spawn(|| {
-            start_tcpinfo_server();
+            start_tcpinfo_server().map_err(|e| {
+                println!("Error {:?}", e);
+                e
+            });
         });
     }
 
@@ -386,6 +389,24 @@ fn start_tcpinfo_server() -> Result<(), anyhow::Error> {
     let socket = Socket::new(Domain::IPV6, Type::STREAM, None)?;
 
     socket.set_reuse_port(true)?;
+
+    use nix::sys::socket::sockopt::TcpCongestion;
+    use nix::sys::socket::SetSockOpt;
+    use std::ffi::OsString;
+
+    let congestion = TcpCongestion {};
+    congestion.set(socket.as_raw_fd(), &OsString::from("cubic"))?;
+
+    /*
+    unsafe {
+        setsockopt(
+            self.as_raw(),
+            libc::IPPROTO_TCP,
+            libc::TCP_CONGESTION,
+            reuse as c_int,
+        )
+    }
+    */
 
     let address: SocketAddr = "[::]:12345".parse().unwrap();
     socket.bind(&address.into())?;

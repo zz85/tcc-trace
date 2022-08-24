@@ -45,15 +45,21 @@ also gave me some understanding how tracepoints work.
 - [x] Basic TCP Probing via Tracepoint
 - [x] Display cwnd, ssthresh, sttt, length
 - [x] Filtering based on IP or port number
-- [x] IP filtering in BPF
+- [x] IP and port filtering in BPF
 - [x] Identify and run timer for individual connections
+- [x] Tracing HTTP server (TCP info)
+- [x] Custom congestion control on TCP Server with `TCP_CONGESTION`
+- [x] Test binaries on different hosts
 
 ## TODOs
-- [x] Test binaries on different hosts
+- [ ] build static glibc
 - [ ] Logging to trace file
 - [ ] Nicer colors, UI
 - [ ] Trace other pieces of connection properties
-- [ ] IP filtering in bpf optimization 
+- [ ] TCC core + Web server integration
+- [ ] Json output
+- [ ] Port knocking
+
 
 ## Prerequisites
 
@@ -80,4 +86,9 @@ cargo build
 
 ```bash
 cargo xtask run
+```
+
+
+```
+cargo xtask run -- --ip 127.0.0.1 --port 80 --map-from 80 --map-to 12345 --http-server --if-name eth0 -d
 ```
