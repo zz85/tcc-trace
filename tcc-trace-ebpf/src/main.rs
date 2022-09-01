@@ -37,7 +37,7 @@ const IPPROTO_UDP: u8 = 17;
 static mut MATCHLIST_V4: HashMap<u32, u8> = HashMap::with_max_entries(1024, 0);
 // TODO, use LSM instead
 
-#[classifier(name = "tc_cls_ingress")]
+#[classifier(name = "tc_modifier")]
 pub fn tc_cls_ingress(ctx: SkBuffContext) -> i32 {
     match { try_tc_cls_ingress(ctx) } {
         Ok(_) => {

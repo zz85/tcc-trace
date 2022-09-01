@@ -127,23 +127,29 @@ async fn main() -> Result<(), anyhow::Error> {
         start.elapsed().as_secs_f64() * 1000.0
     );
 
-    let tcprog: &mut SchedClassifier = bpf.program_mut("tc_cls_ingress").unwrap().try_into()?;
-    tcprog.load()?;
-
-    let ifname = match if_name {
-        Some(name) => name,
-        None => "lo".to_string(),
-    };
-    let _ = tc::qdisc_add_clsact(&ifname);
-    tcprog.attach(&ifname, TcAttachType::Ingress, 0)?;
-    tcprog.attach(&ifname, TcAttachType::Egress, 0)?;
-
     let mut handler = Handler::new(ip, port);
     let event_count = Arc::new(AtomicU64::new(0));
     let filtered_count = Arc::new(AtomicU64::new(0));
     let mut perf_array = AsyncPerfEventArray::try_from(bpf.map_mut("TCP_PROBES")?)?;
     let mut tcc_settings = HashMap::try_from(bpf.map_mut("TCC_SETTINGS")?)?;
     let mut matchlist_v4 = HashMap::try_from(bpf.map_mut("MATCHLIST_V4")?)?;
+
+    if let (Some(map_from), Some(map_to)) = (map_from, map_to) {
+        println!("Set up port forwarding...");
+        tcc_settings.insert(PORT_MAP_TO, map_to as u64, 0)?;
+        tcc_settings.insert(PORT_MAP_FROM, map_from as u64, 0)?;
+
+        let tcprog: &mut SchedClassifier = bpf.program_mut("tc_modifier").unwrap().try_into()?;
+        tcprog.load()?;
+
+        let ifname = match if_name {
+            Some(name) => name,
+            None => "lo".to_string(),
+        };
+        let _ = tc::qdisc_add_clsact(&ifname);
+        tcprog.attach(&ifname, TcAttachType::Ingress, 0)?;
+        tcprog.attach(&ifname, TcAttachType::Egress, 0)?;
+    }
 
     if let Some(ip) = ip {
         if let IpAddr::V4(ip4) = ip {
@@ -155,14 +161,6 @@ async fn main() -> Result<(), anyhow::Error> {
 
     if let Some(port) = port {
         tcc_settings.insert(PORT_FILTER, port as u64, 0)?;
-    }
-
-    if let Some(map_from) = map_from {
-        tcc_settings.insert(PORT_MAP_FROM, map_from as u64, 0)?;
-    }
-
-    if let Some(map_to) = map_to {
-        tcc_settings.insert(PORT_MAP_TO, map_to as u64, 0)?;
     }
 
     let (tx, rx) = mpsc::channel();
