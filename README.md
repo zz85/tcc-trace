@@ -57,8 +57,9 @@ also gave me some understanding how tracepoints work.
 - [ ] Nicer colors, UI
 - [ ] Trace other pieces of connection properties
 - [ ] TCC core + Web server integration
-- [ ] Json output
+- [x] Json output
 - [ ] Port knocking
+- [ ] terminal graphing of congestion window
 
 
 ## Prerequisites
@@ -90,5 +91,5 @@ cargo xtask run
 
 
 ```
-cargo xtask run -- --ip 127.0.0.1 --port 80 --map-from 80 --map-to 12345 --http-server --if-name eth0 -d
+cargo xtask run -- --ip 127.0.0.1 --port 80 --map-from 80 --map-to 12345 --http-server --if-name eth0 -d --congestion-control cubic
 ```

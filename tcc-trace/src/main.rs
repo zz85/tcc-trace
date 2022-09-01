@@ -47,8 +47,13 @@ struct Opt {
     #[clap(short, long, value_parser)]
     http_server: bool,
 
+    /// interface name
     #[clap(long, value_parser)]
     if_name: Option<String>,
+
+    /// congestion control
+    #[clap(long, value_parser)]
+    congestion_control: Option<String>,
 }
 
 #[tokio::main]
@@ -61,11 +66,12 @@ async fn main() -> Result<(), anyhow::Error> {
         map_to,
         http_server,
         if_name,
+        congestion_control,
     } = Opt::parse();
 
     if http_server {
         std::thread::spawn(|| {
-            start_tcpinfo_server().map_err(|e| {
+            start_tcpinfo_server(congestion_control).map_err(|e| {
                 println!("Error {:?}", e);
                 e
             });
@@ -315,25 +321,26 @@ impl Handler {
         let bytes_in_flight = snd_nxt - snd_una;
 
         println!(
-        "{:.5}s | {:.3} ms| {:?}.{} > {:?}.{} | snd_cwnd {} ssthresh {} snd_wnd {} srtt {:3} rcv_wnd {} length {} bytes in flight {}",
-        offset_time as f64 / 1e9 ,
-        connection_duration.as_secs_f64() * 1000.0,
-        source_ip,
-        sport,
-        dest_ip,
-        dport,
-        snd_cwnd,
-        ssthresh,
-        snd_wnd, srtt, rcv_wnd,
-        data_len,
-        bytes_in_flight,
-    );
+            "{:.5}s | {:.3} ms| {:?}.{} > {:?}.{} | snd_cwnd {} ssthresh {} snd_wnd {} srtt {:3} rcv_wnd {} length {} bytes in flight {}",
+            offset_time as f64 / 1e9,
+            connection_duration.as_secs_f64() * 1000.0,
+            source_ip,
+            sport,
+            dest_ip,
+            dport,
+            snd_cwnd,
+            ssthresh,
+            snd_wnd, srtt, rcv_wnd,
+            data_len,
+            bytes_in_flight,
+        );
 
         let info = TcpinfoEvent {
             time: offset_time as f64 / 1e9,
             snd_cwnd: snd_cwnd,
             snd_ssthresh: ssthresh,
             bytes_sent: data_len.into(),
+            bytes_in_flight,
         };
 
         let json = serde_json::to_string(&info).unwrap();
@@ -380,7 +387,7 @@ fn format_socket(sock: socket) -> Option<SocketAddr> {
     }
 }
 
-fn start_tcpinfo_server() -> Result<(), anyhow::Error> {
+fn start_tcpinfo_server(congestion_control: Option<String>) -> Result<(), anyhow::Error> {
     use socket2::{Domain, Socket, Type};
     use std::io::{Read, Write};
     use std::net::TcpListener;
@@ -395,7 +402,10 @@ fn start_tcpinfo_server() -> Result<(), anyhow::Error> {
     use std::ffi::OsString;
 
     let congestion = TcpCongestion {};
-    congestion.set(socket.as_raw_fd(), &OsString::from("cubic"))?;
+    congestion.set(
+        socket.as_raw_fd(),
+        &OsString::from(congestion_control.unwrap_or("cubic".to_string())),
+    )?;
 
     /*
     unsafe {
@@ -470,6 +480,7 @@ fn start_tcpinfo_server() -> Result<(), anyhow::Error> {
                             snd_cwnd: info.tcpi_snd_cwnd,
                             snd_ssthresh: info.tcpi_snd_ssthresh,
                             bytes_sent: info.tcpi_bytes_sent,
+                            bytes_in_flight: info.tcpi_unacked,
                         };
 
                         let json = serde_json::to_string(&info)?;
@@ -509,4 +520,5 @@ struct TcpinfoEvent {
     snd_cwnd: u32,
     snd_ssthresh: u32,
     bytes_sent: u64,
+    bytes_in_flight: u32,
 }
